@@ -68,4 +68,4 @@ def period_label(period: str) -> str:
     return period if label == key else label
 
 
-from .detail_view import render_stock_detail, render_detail_header, render_detail_body  # noqa: E402,F401
+from .detail_view import render_stock_detail, render_detail_header, render_detail_popup, render_detail_body  # noqa: E402,F401

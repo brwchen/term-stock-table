@@ -126,13 +126,9 @@ class DetailHeader:
         outer.add_column(width=max(16, len(price.plain.split("\n")[1]) + 2))
         outer.add_column(justify="right", ratio=1)
         outer.add_row(price, grid)
-        parts = [Align.center(title), outer]
-        if self.expanded:
-            parts.append(Text(t("d_market_data"), style="bold"))
-            parts.append(self.extra_grid())
-        yield Panel(Group(*parts), box=ROUNDED, border_style="cyan", padding=(0, 1))
+        yield Panel(Group(Align.center(title), outer), box=ROUNDED, border_style="cyan", padding=(0, 1))
 
-    def extra_grid(self) -> Table:
+    def extra_grid(self) -> Panel:
         tr = self.tracker
         up, down = trend_styles(self.palette)
         limit = limit_pct(tr.symbol, tr.name)
@@ -158,7 +154,7 @@ class DetailHeader:
             for key, value, st in row:
                 cells += [t(key), Text(value, style=st)]
             grid.add_row(*cells)
-        return grid
+        return Panel(grid, title=t("d_market_data"), box=ROUNDED, border_style="cyan", padding=(0, 1))
 
 
 class PriceChart:
@@ -290,6 +286,10 @@ def side_panel(tracker: StockDataTracker, palette: str):
         Panel(order_book(tracker, palette), title=t("d_book"), box=ROUNDED, border_style="cyan", padding=(0, 1)),
         Panel(tick_table(tracker, palette), title=t("d_ticks"), box=ROUNDED, border_style="cyan", padding=(0, 1)),
     )
+
+
+def render_detail_popup(tracker: StockDataTracker, palette: str = "cn") -> Panel:
+    return DetailHeader(tracker, palette).extra_grid()
 
 
 def render_detail_header(tracker: StockDataTracker, palette: str = "cn", expanded: bool = False) -> DetailHeader:

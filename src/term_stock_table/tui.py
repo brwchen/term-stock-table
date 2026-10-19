@@ -30,7 +30,7 @@ from .config import (
 )
 from .table import create_stock_table, sort_trackers
 from .i18n import t, set_lang, toggle_lang, get_lang
-from .detail import render_detail_header, render_detail_body, period_label, candles_from_prices
+from .detail import render_detail_header, render_detail_body, render_detail_popup, period_label, candles_from_prices
 from .inline_spark import (
     set_image_enabled,
     terminal_supports_images,
@@ -351,6 +351,7 @@ class DetailModal(ScrollKeysMixin, ModalScreen[None]):
     def compose(self) -> ComposeResult:
         with Vertical(id="detail-container"):
             yield Static(id="detail-header")
+            yield Static(id="detail-popup")
             with Horizontal(id="detail-periods"):
                 for i, p in enumerate(self.PERIODS, 1):
                     yield Button(f"{period_label(p)} {i}", id=f"period-{p}", variant="default")
@@ -368,6 +369,9 @@ class DetailModal(ScrollKeysMixin, ModalScreen[None]):
         self.query_one("#detail-header", Static).update(
             render_detail_header(self.tracker, self.palette, self.header_expanded)
         )
+        popup = self.query_one("#detail-popup", Static)
+        popup.update(render_detail_popup(self.tracker, self.palette))
+        popup.display = self.header_expanded
         layout = render_detail_body(
             self.tracker,
             palette=self.palette,
@@ -413,7 +417,7 @@ class DetailModal(ScrollKeysMixin, ModalScreen[None]):
         self.update_content()
 
     def on_click(self, event) -> None:
-        if getattr(event.widget, "id", None) == "detail-header":
+        if getattr(event.widget, "id", None) in ("detail-header", "detail-popup"):
             self.toggle_header()
 
     def on_key(self, event) -> None:
@@ -498,6 +502,20 @@ class StockTerminalApp(App):
     #detail-view {
         width: 100%;
         height: auto;
+    }
+    #detail-container {
+        layers: base popup;
+    }
+    #detail-container > * {
+        layer: base;
+    }
+    #detail-container > #detail-popup {
+        layer: popup;
+        display: none;
+        height: auto;
+        width: 100%;
+        offset: 0 -3;
+        background: #0f1117;
     }
     #detail-header {
         height: auto;
