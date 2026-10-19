@@ -1,5 +1,6 @@
 """Interactive Textual TUI Application for real-time stock monitoring."""
 import asyncio
+import sys
 from typing import List, Optional, Dict, Any
 from textual.app import App, ComposeResult
 from textual.containers import Container, Vertical, Horizontal
@@ -24,7 +25,16 @@ from .config import (
 )
 from .table import create_stock_table
 from .detail import render_stock_detail
-from .inline_spark import set_image_enabled
+from .inline_spark import (
+    set_image_enabled,
+    terminal_supports_images,
+    overlay_begin,
+    overlay_end,
+    overlay_blank,
+    OVERLAY_BLANK_WIDTH,
+    _image,
+)
+from rich.cells import cell_len
 from .boss import render_boss_view, PROFILES
 from .portfolio import calculate_portfolio_pnl, create_portfolio_table
 from .alerts import evaluate_alerts
@@ -389,6 +399,8 @@ class StockTerminalApp(App):
     ):
         super().__init__()
         set_image_enabled(False)
+        self.overlay_enabled = sys.stdout.isatty() and terminal_supports_images()
+        self.overlay_items: list = []
         self.symbols_list = symbols or load_watchlist()
         self.palette = palette
         self.theme_manager = ThemeManager(theme or palette)
@@ -416,6 +428,40 @@ class StockTerminalApp(App):
         self.title = "term-stock-table (Professional Financial Workstation)"
         self.update_view()
         self.set_interval(self.refresh_interval, self.refresh_market_data)
+        if self.overlay_enabled:
+            self.install_overlay_hook()
+
+    def install_overlay_hook(self) -> None:
+        """Append smooth term-sparkline images to every frame so they never get erased."""
+        driver = self._driver
+        orig_write = driver.write
+
+        def write(data: str) -> None:
+            orig_write(data + (self.overlay_payload() if len(data) > 40 else ""))
+
+        driver.write = write
+
+    def overlay_payload(self) -> str:
+        if not self.overlay_items or len(self.screen_stack) > 1:
+            return ""
+        try:
+            strips = self.screen._compositor.render_strips()
+        except Exception:
+            return ""
+        blank = overlay_blank(OVERLAY_BLANK_WIDTH)
+        out = ["\x1b7"]
+        idx = 0
+        for y, strip in enumerate(strips):
+            text = strip.text
+            x = text.find(blank)
+            if x < 0 or idx >= len(self.overlay_items):
+                continue
+            data, length, palette = self.overlay_items[idx]
+            idx += 1
+            img = _image(tuple(data), length, palette, (("fill", False), ("show_dot", False)))
+            out.append(f"\x1b[{y + 1};{cell_len(text[:x]) + 1}H{img}")
+        out.append("\x1b8")
+        return "".join(out) if idx else ""
 
     def refresh_trackers_from_disk(self) -> None:
         """Reload watchlist from disk."""
@@ -468,6 +514,7 @@ class StockTerminalApp(App):
         except Exception:
             return
 
+        self.overlay_items = []
         if self.is_boss_mode:
             prof = PROFILES[self.boss_profile_idx % len(PROFILES)]
             renderable = render_boss_view(prof, trackers=self.trackers)
@@ -479,6 +526,7 @@ class StockTerminalApp(App):
             view_widget.update(tbl)
         else:
             sort_col = self.sort_columns[self.sort_col_idx]
+            queue = overlay_begin() if self.overlay_enabled else None
             tbl = create_stock_table(
                 self.trackers,
                 palette=self.palette,
@@ -488,6 +536,8 @@ class StockTerminalApp(App):
                 reverse=self.sort_descending,
                 alerts_triggered=self.alerts_triggered,
             )
+            overlay_end()
+            self.overlay_items = queue or []
             view_widget.update(tbl)
 
     def action_toggle_boss(self) -> None:

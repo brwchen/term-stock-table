@@ -6,6 +6,7 @@ from rich.text import Text
 from rich.box import ROUNDED, HEAVY_EDGE, SIMPLE
 from .api import StockDataTracker
 from .inline_spark import smart_spark, image_sparklines_supported
+from . import inline_spark as _isp
 from .indicators import compute_bollinger_bands, render_bollinger_badge
 
 
@@ -41,7 +42,7 @@ def create_stock_table(
 ) -> Table:
     """Create a high-density, professional Rich Table for stock monitoring with sorting & alert indicators."""
     is_cn = (palette == "cn")
-    spark_rows = 1 if image_sparklines_supported() and sys.stdout.isatty() else 2
+    spark_rows = 1 if _isp.OVERLAY_QUEUE is not None or (image_sparklines_supported() and sys.stdout.isatty()) else 2
     # Sort trackers if requested
     sorted_trackers = list(trackers)
     if sort_by:

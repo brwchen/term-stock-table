@@ -109,6 +109,36 @@ class AutoCurve:
         yield braille_curve(self.series, max(8, options.max_width), self.rows, self.palette, self.fill)
 
 
+OVERLAY_BLANK_WIDTH = 20
+OVERLAY_QUEUE: Optional[list] = None
+
+
+def overlay_begin() -> list:
+    """Start collecting trend cells that the TUI paints as images after each frame."""
+    global OVERLAY_QUEUE
+    OVERLAY_QUEUE = []
+    return OVERLAY_QUEUE
+
+
+def overlay_end() -> None:
+    global OVERLAY_QUEUE
+    OVERLAY_QUEUE = None
+
+
+def overlay_blank(width: int) -> str:
+    return "\u2800" * width
+
+
+def terminal_supports_images() -> bool:
+    forced = os.environ.get("STK_SPARK_MODE", "").lower()
+    if forced:
+        return forced == "image"
+    try:
+        return str(detect_terminal_protocol().value) == "iterm2"
+    except Exception:
+        return False
+
+
 def image_sparklines_supported() -> bool:
     """True when the terminal renders iTerm2 inline images (iTerm2, WezTerm, ...)."""
     if not IMAGE_ENABLED:
@@ -137,6 +167,13 @@ def smart_spark(
 ) -> RenderableType:
     """Smooth image curve on iTerm2-like terminals, connected braille curve elsewhere."""
     data = list(series)
+    if OVERLAY_QUEUE is not None and rows == 1 and len(data) >= 2:
+        OVERLAY_QUEUE.append((data, length, palette))
+        text = Text(overlay_blank(length))
+        if annotation is not None:
+            text.append(" ")
+            text.append_text(annotation)
+        return text
     if rows == 1 and len(data) >= 2 and sys.stdout.isatty() and image_sparklines_supported():
         return InlineSparkCell(data, length, annotation, palette=palette, **{k: v for k, v in kwargs.items() if k != "up"})
     text = braille_curve(data, length, rows, palette, fill=bool(kwargs.get("fill")), up=kwargs.get("up"))
