@@ -33,15 +33,20 @@ def braille_curve(
     fill: bool = False,
     baseline: Optional[float] = None,
     up: Optional[bool] = None,
+    lo: Optional[float] = None,
+    hi: Optional[float] = None,
 ) -> Text:
     """Connected braille line chart: (2*width) x (4*rows) dots, continuous like a smooth curve."""
     data = [float(v) for v in series]
     if len(data) < 2:
         return Text(" " * width)
     pw, ph = width * 2, rows * 4
+    lo_override, hi_override = lo, hi
     lo, hi = min(data), max(data)
     if baseline is not None:
         lo, hi = min(lo, baseline), max(hi, baseline)
+    if lo_override is not None and hi_override is not None:
+        lo, hi = lo_override, hi_override
     span = (hi - lo) or 1.0
 
     def level(v: float) -> int:

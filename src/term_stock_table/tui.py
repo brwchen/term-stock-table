@@ -30,7 +30,7 @@ from .config import (
 )
 from .table import create_stock_table, sort_trackers
 from .i18n import t, set_lang, toggle_lang, get_lang
-from .detail import render_stock_detail, period_label, candles_from_prices
+from .detail import render_detail_header, render_detail_body, period_label, candles_from_prices
 from .inline_spark import (
     set_image_enabled,
     terminal_supports_images,
@@ -349,11 +349,12 @@ class DetailModal(ScrollKeysMixin, ModalScreen[None]):
 
     def compose(self) -> ComposeResult:
         with Vertical(id="detail-container"):
-            with DetailScroll(id="detail-scroll"):
-                yield Static(id="detail-view")
+            yield Static(id="detail-header")
             with Horizontal(id="detail-periods"):
                 for i, p in enumerate(self.PERIODS, 1):
                     yield Button(f"{period_label(p)} {i}", id=f"period-{p}", variant="default")
+            with DetailScroll(id="detail-scroll"):
+                yield Static(id="detail-view")
             with Horizontal(id="detail-footer"):
                 yield Button(t("add_note_btn"), id="detail-note-btn", variant="primary")
                 yield Button(t("close_enter"), id="detail-close-btn", variant="default")
@@ -363,7 +364,8 @@ class DetailModal(ScrollKeysMixin, ModalScreen[None]):
 
     def update_content(self) -> None:
         notes = get_symbol_notes(self.tracker.symbol)
-        layout = render_stock_detail(
+        self.query_one("#detail-header", Static).update(render_detail_header(self.tracker, self.palette))
+        layout = render_detail_body(
             self.tracker,
             palette=self.palette,
             notes=notes,
@@ -373,7 +375,7 @@ class DetailModal(ScrollKeysMixin, ModalScreen[None]):
         )
         self.query_one("#detail-view", Static).update(layout)
         for p in self.PERIODS:
-            self.query_one(f"#period-{p}", Button).variant = "warning" if p == self.period else "default"
+            self.query_one(f"#period-{p}", Button).set_class(p == self.period, "active")
 
     def set_period(self, period: str) -> None:
         self.period = period
@@ -479,14 +481,29 @@ class StockTerminalApp(App):
         height: 1fr;
     }
     #detail-view {
-        width: auto;
-        min-width: 100%;
+        width: 100%;
         height: auto;
+    }
+    #detail-header {
+        height: auto;
+        margin-bottom: 1;
     }
     #detail-periods {
         height: 1;
-        align: center middle;
+        align: left middle;
         overflow: hidden hidden;
+    }
+    #detail-periods Button {
+        background: transparent;
+        color: $text-muted;
+        text-style: none;
+    }
+    #detail-periods Button.active {
+        color: #ff5252;
+        text-style: bold underline;
+    }
+    #detail-periods Button:hover {
+        background: #1a202c;
     }
     #detail-footer {
         height: 1;
