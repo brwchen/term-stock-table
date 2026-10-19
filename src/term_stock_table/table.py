@@ -122,12 +122,11 @@ def create_stock_table(
         # Sparkline Curve
         spark_text = sparkline(
             price_list,
-            length=12,
-            mode="braille",
+            length=16,
+            mode="block",
             palette=palette,
-            fill=(not monochrome),
-            baseline=tr.prev_close,
-            show_dot=True,
+            fill=False,
+            show_dot=False,
             annotate=(not monochrome),
         )
 
