@@ -123,6 +123,7 @@ def create_stock_table(
         spark_text = sparkline(
             price_list,
             length=12,
+            mode="braille",
             palette=palette,
             fill=(not monochrome),
             baseline=tr.prev_close,

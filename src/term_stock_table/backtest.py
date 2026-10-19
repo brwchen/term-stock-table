@@ -122,8 +122,8 @@ class StrategyBacktester:
         pos_color = "red" if self.palette == "cn" else "green"
         neg_color = "green" if self.palette == "cn" else "red"
 
-        strat_spark = sparkline(res.strategy_curve, length=20, palette=self.palette)
-        bench_spark = sparkline(res.benchmark_curve, length=20, palette=self.palette)
+        strat_spark = sparkline(res.strategy_curve, length=20, mode="braille", palette=self.palette)
+        bench_spark = sparkline(res.benchmark_curve, length=20, mode="braille", palette=self.palette)
 
         ret_col = pos_color if res.total_return_pct >= 0 else neg_color
         bench_col = pos_color if res.benchmark_return_pct >= 0 else neg_color

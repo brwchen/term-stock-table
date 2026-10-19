@@ -104,6 +104,7 @@ def render_stock_detail(
         combo_spark = price_volume_sparkline(
             price_list,
             vol_list,
+            mode="braille",
             palette=palette,
             annotate=True,
         )

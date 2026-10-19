@@ -114,8 +114,8 @@ class MarketRadarTracker:
         up_bar = f"[{pos_color}]{'█' * up_blocks}[/][{neg_color}]{'█' * down_blocks}[/]"
 
         # Sparklines for capital flow
-        nb_spark = sparkline(s.northbound_curve, length=12, palette=self.palette)
-        sb_spark = sparkline(s.southbound_curve, length=12, palette=self.palette)
+        nb_spark = sparkline(s.northbound_curve, length=12, mode="braille", palette=self.palette)
+        sb_spark = sparkline(s.southbound_curve, length=12, mode="braille", palette=self.palette)
 
         grid = Table.grid(padding=(0, 2))
         grid.add_column(justify="left")
