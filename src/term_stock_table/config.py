@@ -23,6 +23,7 @@ DEFAULT_WATCHLIST = [
 
 DEFAULT_SETTINGS = {
     "palette": "cn",  # "cn" (Red up/Green down) or "us" (Green up/Red down)
+    "language": "en",  # "en" or "zh"
     "refresh_interval": 1.0,
     "sparkline_length": 14,
     "default_boss_profile": "devops",  # "devops", "nginx", "monochrome"

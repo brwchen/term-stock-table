@@ -828,11 +828,24 @@ def test_tracker_default_history_and_curve_keeps_spike():
 def test_kline_period_detail_rendering():
     from rich.console import Console
     from term_stock_table.detail import candles_from_prices
+    from term_stock_table.i18n import set_lang
 
     candles = candles_from_prices([10 + (i % 7) * 0.3 for i in range(120)], count=30)
     assert len(candles) >= 20 and all(c["high"] >= c["low"] for c in candles)
     tracker = StockDataTracker("600519")
     layout = render_stock_detail(tracker, period="day", candles=candles)
     console = Console(width=160, height=50, record=True, file=io.StringIO())
+    set_lang("en")
     console.print(layout)
-    assert "K-Line [日K]" in console.export_text()
+    assert "K-Line [Daily]" in console.export_text()
+
+
+def test_language_switch():
+    from term_stock_table.i18n import t, set_lang, toggle_lang, get_lang
+
+    set_lang("en")
+    assert t("col_price") == "Price" and t("missing_key") == "missing_key"
+    assert toggle_lang() == "zh" and t("col_price") == "现价"
+    assert t("n_added", symbol="AAPL").startswith("已添加")
+    set_lang("en")
+    assert get_lang() == "en"

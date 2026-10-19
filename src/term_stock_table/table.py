@@ -3,6 +3,7 @@ from typing import List, Optional, Dict, Any
 from rich.table import Table
 from rich.style import Style
 from rich.text import Text
+from .i18n import t
 from rich.box import ROUNDED, HEAVY_EDGE, SIMPLE
 from .api import StockDataTracker
 from .inline_spark import smart_spark
@@ -71,18 +72,18 @@ def create_stock_table(
 
     # Define all available columns
     all_col_defs = {
-        "symbol": ("Symbol", "center", "bold cyan", 9),
-        "name": ("Name", "left", "bold white", 14),
-        "price": ("Price", "right", "bold", 10),
-        "change_pct": ("Change%", "right", "bold", 10),
-        "change": ("Change", "right", "dim", 9),
-        "amplitude": ("Amp%", "right", "dim", 8),
-        "turnover_rate": ("Turnover%", "right", "dim", 10),
-        "volume": ("Volume", "right", "dim cyan", 10),
-        "amount": ("Amount", "right", "dim yellow", 10),
-        "pe": ("P/E", "right", "dim magenta", 7),
-        "bollinger": ("Bollinger (%b)", "center", "bold", 14),
-        "sparkline": ("Real-time Trend (Sparkline)", "left", "none", 32),
+        "symbol": (t("col_symbol"), "center", "bold cyan", 9),
+        "name": (t("col_name"), "left", "bold white", 14),
+        "price": (t("col_price"), "right", "bold", 10),
+        "change_pct": (t("col_change_pct"), "right", "bold", 10),
+        "change": (t("col_change"), "right", "dim", 9),
+        "amplitude": (t("col_amplitude"), "right", "dim", 8),
+        "turnover_rate": (t("col_turnover"), "right", "dim", 10),
+        "volume": (t("col_volume"), "right", "dim cyan", 10),
+        "amount": (t("col_amount"), "right", "dim yellow", 10),
+        "pe": (t("col_pe"), "right", "dim magenta", 7),
+        "bollinger": (t("col_bollinger"), "center", "bold", 14),
+        "sparkline": (t("col_trend"), "left", "none", 32),
     }
 
     cols_to_show = visible_columns or list(all_col_defs.keys())
@@ -165,11 +166,13 @@ def create_stock_table(
 
     # Market Sentiment in Caption
     total = len(sorted_trackers)
-    sentiment_str = f"Market: [bold green]▲ {up_count}[/] Up | [bold red]▼ {down_count}[/] Down | [bold white]- {flat_count}[/] Flat (Total: {total})" if not is_cn else f"市场情绪: [bold red]▲ {up_count} 涨[/] | [bold green]▼ {down_count} 跌[/] | [bold white]- {flat_count} 平[/] (自选: {total} 只)"
-    source_tag = "[bold green][● LIVE QUOTE (Tencent API)][/]" if is_live else "[bold yellow][○ SIMULATION ENGINE][/]"
-    
-    sort_info = f" | Sort: [bold cyan]{sort_by or 'default'}[/] ({'DESC' if reverse else 'ASC'})" if sort_by else ""
-    table.title = f"⚡ TERM-STOCK-TABLE FINANCIAL TERMINAL ⚡  {source_tag}{sort_info}"
-    table.caption = f"{sentiment_str} | [bold cyan]s[/] Sort | [bold green]P[/] Portfolio | [bold magenta]b[/] Boss Key | [bold yellow]q[/] Quit"
+    sentiment_key = "sentiment_cn_colors" if is_cn else "sentiment"
+    sentiment_str = t(sentiment_key, up_count=up_count, down=down_count, flat=flat_count, total=len(sorted_trackers))
+    tag = t("tag_live") if is_live else t("tag_sim")
+    source_tag = f"[bold green][{tag}][/]" if is_live else f"[bold yellow][{tag}][/]"
+
+    sort_info = f" | {t('sort_label')}: [bold cyan]{sort_by or t('default')}[/] ({t('desc') if reverse else t('asc')})" if sort_by else ""
+    table.title = f"⚡ {t('table_title')} ⚡  {source_tag}{sort_info}"
+    table.caption = f"{sentiment_str} | {t('caption_keys')}"
 
     return table

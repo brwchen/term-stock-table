@@ -1,5 +1,6 @@
 """Interactive Textual TUI Application for real-time stock monitoring."""
 import asyncio
+import dataclasses
 import sys
 from typing import List, Optional, Dict, Any
 from textual.app import App, ComposeResult
@@ -24,6 +25,7 @@ from .config import (
     save_alert,
 )
 from .table import create_stock_table
+from .i18n import t, set_lang, toggle_lang, get_lang
 from .detail import render_stock_detail, period_label, candles_from_prices
 from .inline_spark import (
     set_image_enabled,
@@ -56,13 +58,13 @@ class AlertModal(ModalScreen[None]):
 
     def compose(self) -> ComposeResult:
         with Vertical(id="alert-dialog"):
-            yield Label(f"🔔 Set Price Alert for {self.stock_name} ({self.symbol})", id="alert-title")
-            yield Input(placeholder="Target High Price (e.g. 1800.0)", id="high-input")
-            yield Input(placeholder="Stop Low Price (e.g. 1200.0)", id="low-input")
-            yield Input(placeholder="Max Volatility % (e.g. 3.0)", id="pct-input")
+            yield Label(t("alert_title", name=self.stock_name, symbol=self.symbol), id="alert-title")
+            yield Input(placeholder=t("alert_high"), id="high-input")
+            yield Input(placeholder=t("alert_low"), id="low-input")
+            yield Input(placeholder=t("alert_pct"), id="pct-input")
             with Horizontal(id="alert-buttons"):
-                yield Button("Save Alert (Enter)", variant="primary", id="save-alert-btn")
-                yield Button("Cancel (Esc)", variant="default", id="cancel-alert-btn")
+                yield Button(t("save_alert"), variant="primary", id="save-alert-btn")
+                yield Button(t("cancel"), variant="default", id="cancel-alert-btn")
 
     def on_mount(self) -> None:
         self.query_one("#high-input", Input).focus()
@@ -78,7 +80,7 @@ class AlertModal(ModalScreen[None]):
             pct_val = float(p_text) if p_text else None
             
             save_alert(self.symbol, target_high=high_val, target_low=low_val, max_change_pct=pct_val)
-            self.app.notify(f"Alert configured for {self.symbol}!")
+            self.app.notify(t("n_alert_set", symbol=self.symbol))
             self.dismiss()
         else:
             self.dismiss()
@@ -94,11 +96,11 @@ class NoteModal(ModalScreen[None]):
 
     def compose(self) -> ComposeResult:
         with Vertical(id="note-dialog"):
-            yield Label(f"📝 Add Investment Note for {self.stock_name} ({self.symbol})", id="note-title")
+            yield Label(t("note_title", name=self.stock_name, symbol=self.symbol), id="note-title")
             yield Input(placeholder="e.g. Target price 1800, stop loss 1250, wait for Q3 earnings...", id="note-input")
             with Horizontal(id="note-buttons"):
-                yield Button("Save (Enter)", variant="primary", id="save-btn")
-                yield Button("Cancel (Esc)", variant="default", id="cancel-btn")
+                yield Button(t("save"), variant="primary", id="save-btn")
+                yield Button(t("cancel"), variant="default", id="cancel-btn")
 
     def on_mount(self) -> None:
         self.query_one(Input).focus()
@@ -107,7 +109,7 @@ class NoteModal(ModalScreen[None]):
         text = event.value.strip()
         if text:
             save_note(self.symbol, text, tags=["manual", "trade"])
-            self.app.notify(f"Note saved for {self.symbol}!")
+            self.app.notify(t("n_note_saved", symbol=self.symbol))
         self.dismiss()
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
@@ -115,7 +117,7 @@ class NoteModal(ModalScreen[None]):
             inp = self.query_one(Input)
             if inp.value.strip():
                 save_note(self.symbol, inp.value.strip(), tags=["manual", "trade"])
-                self.app.notify(f"Note saved for {self.symbol}!")
+                self.app.notify(t("n_note_saved", symbol=self.symbol))
             self.dismiss()
         else:
             self.dismiss()
@@ -126,11 +128,11 @@ class AddStockModal(ModalScreen[None]):
 
     def compose(self) -> ComposeResult:
         with Vertical(id="add-dialog"):
-            yield Label("🔍 Add Stock Symbol (e.g. 600519, 000001, AAPL, NVDA, 00700):", id="add-title")
+            yield Label(t("add_title"), id="add-title")
             yield Input(placeholder="Enter stock code...", id="add-input")
             with Horizontal(id="add-buttons"):
-                yield Button("Add (Enter)", variant="primary", id="add-btn")
-                yield Button("Cancel (Esc)", variant="default", id="cancel-btn")
+                yield Button(t("add"), variant="primary", id="add-btn")
+                yield Button(t("cancel"), variant="default", id="cancel-btn")
 
     def on_mount(self) -> None:
         self.query_one(Input).focus()
@@ -139,9 +141,9 @@ class AddStockModal(ModalScreen[None]):
         sym = event.value.strip().upper()
         if sym:
             if add_to_watchlist(sym):
-                self.app.notify(f"Added {sym} to watchlist!")
+                self.app.notify(t("n_added", symbol=sym))
             else:
-                self.app.notify(f"{sym} already in watchlist.", severity="warning")
+                self.app.notify(t("n_exists", symbol=sym), severity="warning")
             self.app.refresh_trackers_from_disk()
         self.dismiss()
 
@@ -169,7 +171,7 @@ class RadarModal(ModalScreen[None]):
         with Vertical(id="detail-container"):
             yield Static(radar.render_full_radar_view(), id="detail-view")
             with Horizontal(id="detail-footer"):
-                yield Button("Close (Esc)", id="close-radar-btn", variant="default")
+                yield Button(t("close"), id="close-radar-btn", variant="default")
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         self.dismiss()
@@ -190,7 +192,7 @@ class SectorModal(ModalScreen[None]):
         with Vertical(id="detail-container"):
             yield Static(sec.render_full_sector_view(), id="detail-view")
             with Horizontal(id="detail-footer"):
-                yield Button("Close (Esc)", id="close-sector-btn", variant="default")
+                yield Button(t("close"), id="close-sector-btn", variant="default")
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         self.dismiss()
@@ -212,7 +214,7 @@ class BacktestModal(ModalScreen[None]):
         with Vertical(id="detail-container"):
             yield Static(bt.render_backtest_panel(), id="detail-view")
             with Horizontal(id="detail-footer"):
-                yield Button("Close (Esc)", id="close-bt-btn", variant="default")
+                yield Button(t("close"), id="close-bt-btn", variant="default")
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         self.dismiss()
@@ -226,16 +228,16 @@ class ThemeModal(ModalScreen[None]):
 
     def compose(self) -> ComposeResult:
         with Vertical(id="alert-dialog"):
-            yield Label("🎨 Choose Color Theme Preset:", id="alert-title")
+            yield Label(t("theme_title"), id="alert-title")
             for key, th in THEMES.items():
                 yield Button(f"{key.upper()} - {th.description}", id=f"theme-{key}", variant="default")
-            yield Button("Close (Esc)", id="close-theme-btn", variant="primary")
+            yield Button(t("close"), id="close-theme-btn", variant="primary")
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id and event.button.id.startswith("theme-"):
             theme_key = event.button.id.replace("theme-", "")
             self.app.theme_manager.set_theme(theme_key)
-            self.app.notify(f"Theme switched to: {theme_key.upper()}")
+            self.app.notify(t("n_theme", theme=theme_key.upper()))
             self.app.update_view()
             self.dismiss()
         else:
@@ -251,10 +253,10 @@ class FormulaModal(ModalScreen[None]):
     def compose(self) -> ComposeResult:
         formulas = FormulaManager.load_formulas()
         with Vertical(id="alert-dialog"):
-            yield Label("📐 Custom Quantitative Formulas:", id="alert-title")
+            yield Label(t("formula_title"), id="alert-title")
             for name, f in formulas.items():
                 yield Label(f"• [bold cyan]{name}:[/] [yellow]{f.expression}[/] - [dim]{f.description}[/]")
-            yield Button("Close (Esc)", id="close-formula-btn", variant="primary")
+            yield Button(t("close"), id="close-formula-btn", variant="primary")
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         self.dismiss()
@@ -283,8 +285,8 @@ class DetailModal(ModalScreen[None]):
                 for i, p in enumerate(self.PERIODS, 1):
                     yield Button(f"{period_label(p)} ({i})", id=f"period-{p}", variant="default")
             with Horizontal(id="detail-footer"):
-                yield Button("Add Note ('n')", id="detail-note-btn", variant="primary")
-                yield Button("Close (Esc/Enter)", id="detail-close-btn", variant="default")
+                yield Button(t("add_note_btn"), id="detail-note-btn", variant="primary")
+                yield Button(t("close_enter"), id="detail-close-btn", variant="default")
 
     def on_mount(self) -> None:
         self.update_content()
@@ -306,7 +308,7 @@ class DetailModal(ModalScreen[None]):
     def set_period(self, period: str) -> None:
         self.period = period
         if period != "intraday" and period not in self.kline_cache:
-            self.kline_note[period] = "Loading K-line data..."
+            self.kline_note[period] = t("d_loading")
             self.run_worker(lambda: self.load_kline(period), thread=True, exclusive=True, group="kline")
         self.update_content()
 
@@ -317,7 +319,7 @@ class DetailModal(ModalScreen[None]):
             candles = fetch_kline(self.tracker.symbol, period)
         if not candles:
             candles = candles_from_prices(list(self.tracker.prices))
-            note = "Simulated candles (real K-line data unavailable for this period/market)"
+            note = t("d_simulated")
         self.kline_cache[period] = candles
         self.kline_note[period] = note
         self.app.call_from_thread(self.update_content)
@@ -400,7 +402,7 @@ class StockTerminalApp(App):
     """
 
     BINDINGS = [
-        Binding("b", "toggle_boss", "Boss Key (摸鱼模式)", priority=True),
+        Binding("b", "toggle_boss", "Boss Key", priority=True),
         Binding("escape", "handle_escape", "Escape", priority=True),
         Binding("tab", "cycle_boss_profile", "Next Boss Disguise"),
         Binding("enter", "show_detail", "Stock Detail"),
@@ -424,8 +426,22 @@ class StockTerminalApp(App):
         Binding("B", "show_backtest", "Strategy Backtest"),
         Binding("P", "toggle_portfolio", "Portfolio View"),
         Binding("p", "toggle_palette", "CN/US Palette"),
+        Binding("L", "toggle_language", "Language 中/EN"),
         Binding("q", "quit", "Quit"),
     ]
+
+    BINDING_LABELS = {
+        ("b", "toggle_boss"): "b_boss", ("escape", "handle_escape"): "b_escape",
+        ("tab", "cycle_boss_profile"): "b_tab", ("enter", "show_detail"): "b_enter",
+        ("n", "add_note"): "b_note", ("l", "set_alert"): "b_alert", ("a", "add_stock"): "b_add",
+        ("slash", "add_stock"): "b_search", ("d", "delete_stock"): "b_delete",
+        ("s", "cycle_sort"): "b_sort", ("r", "reverse_sort"): "b_reverse",
+        ("T", "show_themes"): "b_themes", ("F", "show_formulas"): "b_formulas",
+        ("R", "show_radar"): "b_radar", ("S", "show_sector"): "b_sector",
+        ("B", "show_backtest"): "b_backtest", ("P", "toggle_portfolio"): "b_portfolio",
+        ("p", "toggle_palette"): "b_palette", ("L", "toggle_language"): "b_lang",
+        ("q", "quit"): "b_quit",
+    }
 
     def __init__(
         self,
@@ -434,8 +450,10 @@ class StockTerminalApp(App):
         theme: str = "classic_cn",
         use_real_data: bool = True,
         refresh_interval: float = 1.0,
+        lang: Optional[str] = None,
     ):
         super().__init__()
+        set_lang(lang or load_settings().get("language", "en"))
         set_image_enabled(False)
         self.overlay_enabled = sys.stdout.isatty() and terminal_supports_images()
         self.overlay_items: list = []
@@ -463,11 +481,31 @@ class StockTerminalApp(App):
         yield Footer()
 
     def on_mount(self) -> None:
-        self.title = "term-stock-table (Professional Financial Workstation)"
+        self.apply_language()
         self.update_view()
         self.set_interval(self.refresh_interval, self.refresh_market_data)
         if self.overlay_enabled:
             self.install_overlay_hook()
+
+    def apply_language(self) -> None:
+        """Retitle the app and footer bindings in the active language."""
+        self.title = t("app_title")
+        for key, bindings in self._bindings.key_to_bindings.items():
+            for i, binding in enumerate(bindings):
+                label = self.BINDING_LABELS.get((binding.key, binding.action))
+                if label:
+                    bindings[i] = dataclasses.replace(binding, description=t(label))
+        self.refresh_bindings()
+
+    def action_toggle_language(self) -> None:
+        """Switch UI language between English and Chinese and persist the choice."""
+        lang = toggle_lang()
+        settings = load_settings()
+        settings["language"] = lang
+        save_settings(settings)
+        self.apply_language()
+        self.update_view()
+        self.notify(t("lang_switched"))
 
     def install_overlay_hook(self) -> None:
         """Append smooth term-sparkline images to every frame so they never get erased."""
@@ -599,20 +637,20 @@ class StockTerminalApp(App):
     def action_toggle_portfolio(self) -> None:
         """Toggle between Watchlist and Portfolio asset view."""
         self.is_portfolio_mode = not self.is_portfolio_mode
-        self.notify(f"Mode: {'Portfolio Holdings' if self.is_portfolio_mode else 'Watchlist'}")
+        self.notify(t("n_mode", mode=t("mode_portfolio") if self.is_portfolio_mode else t("mode_watchlist")))
         self.update_view()
 
     def action_cycle_sort(self) -> None:
         """Cycle sorting column."""
         self.sort_col_idx = (self.sort_col_idx + 1) % len(self.sort_columns)
         curr = self.sort_columns[self.sort_col_idx] or "Default"
-        self.notify(f"Sorted by: {curr.upper()}")
+        self.notify(t("n_sorted", col=curr.upper()))
         self.update_view()
 
     def action_reverse_sort(self) -> None:
         """Reverse sorting order."""
         self.sort_descending = not self.sort_descending
-        self.notify(f"Order: {'Descending (▼)' if self.sort_descending else 'Ascending (▲)'}")
+        self.notify(t("n_order", order=t("order_desc") if self.sort_descending else t("order_asc")))
         self.update_view()
 
     def action_open_detail(self, symbol: str) -> None:
@@ -652,7 +690,7 @@ class StockTerminalApp(App):
         if self.trackers:
             tr = self.trackers[self.selected_index % len(self.trackers)]
             remove_from_watchlist(tr.symbol)
-            self.notify(f"Removed {tr.symbol} from watchlist.")
+            self.notify(t("n_removed", symbol=tr.symbol))
             self.refresh_trackers_from_disk()
 
     def action_cursor_down(self) -> None:
@@ -660,28 +698,28 @@ class StockTerminalApp(App):
         if self.trackers:
             self.selected_index = (self.selected_index + 1) % len(self.trackers)
             tr = self.trackers[self.selected_index]
-            self.notify(f"Selected: {tr.name} ({tr.symbol})")
+            self.notify(t("n_selected", name=tr.name, symbol=tr.symbol))
 
     def action_cursor_up(self) -> None:
         """Vim 'k' / Up: Move highlighted stock selection up."""
         if self.trackers:
             self.selected_index = (self.selected_index - 1) % len(self.trackers)
             tr = self.trackers[self.selected_index]
-            self.notify(f"Selected: {tr.name} ({tr.symbol})")
+            self.notify(t("n_selected", name=tr.name, symbol=tr.symbol))
 
     def action_cursor_top(self) -> None:
         """Vim 'g' / Home: Jump to first stock."""
         if self.trackers:
             self.selected_index = 0
             tr = self.trackers[0]
-            self.notify(f"Selected (Top): {tr.name} ({tr.symbol})")
+            self.notify(t("n_selected_top", name=tr.name, symbol=tr.symbol))
 
     def action_cursor_bottom(self) -> None:
         """Vim 'G' / End: Jump to last stock."""
         if self.trackers:
             self.selected_index = len(self.trackers) - 1
             tr = self.trackers[-1]
-            self.notify(f"Selected (Bottom): {tr.name} ({tr.symbol})")
+            self.notify(t("n_selected_bottom", name=tr.name, symbol=tr.symbol))
 
     def action_show_themes(self) -> None:
         """Open theme preset switcher modal."""
@@ -708,5 +746,5 @@ class StockTerminalApp(App):
     def action_toggle_palette(self) -> None:
         """Toggle between CN (Red Up) and US (Green Up) color palettes."""
         self.palette = "us" if self.palette == "cn" else "cn"
-        self.notify(f"Switched palette to: {self.palette.upper()}")
+        self.notify(t("n_palette", palette=self.palette.upper()))
         self.update_view()

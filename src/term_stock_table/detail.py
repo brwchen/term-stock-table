@@ -20,12 +20,9 @@ from .indicators import (
 )
 from .market import simulate_capital_flow
 from .config import get_symbol_notes
+from .i18n import t
 
 
-PERIOD_LABELS = {
-    "intraday": "分时", "m5": "5分", "m15": "15分", "m30": "30分", "m60": "60分",
-    "day": "日K", "week": "周K", "month": "月K",
-}
 
 
 def candles_from_prices(prices: List[float], count: int = 30) -> List[Dict[str, Any]]:
@@ -52,7 +49,7 @@ class CandleView:
         n = max(8, (options.max_width - 12) // 2)
         shown = self.candles[-n:]
         last = shown[-1]
-        yield Text(f"─── K-Line [{period_label(self.period)}] {shown[0]['date']} → {last['date']} ───", style="bold gold1")
+        yield Text(f"─── {t('d_kline')} [{period_label(self.period)}] {shown[0]['date']} → {last['date']} ───", style="bold gold1")
         for line in render_candlestick_chart(shown, height=10, palette=self.palette, gap=1).split("\n"):
             yield Text.from_ansi(line)
         yield Text(
@@ -61,12 +58,14 @@ class CandleView:
         )
         vols = [c.get("volume", 0.0) for c in shown]
         if any(vols):
-            yield Text("─── Volume ───", style="bold gold1")
+            yield Text(f"─── {t('d_volume')} ───", style="bold gold1")
             yield Text.from_ansi(sparkline(vols, length=len(vols), mode="block", palette=self.palette, annotate=False))
 
 
 def period_label(period: str) -> str:
-    return PERIOD_LABELS.get(period, period)
+    key = f"p_{period}"
+    label = t(key)
+    return period if label == key else label
 
 
 def render_stock_detail(
@@ -145,10 +144,10 @@ def render_stock_detail(
         if period != "intraday" and period_note:
             chart_content.append(f"{period_note}\n", style="bold yellow")
         vol_bars = sparkline(vol_list, length=40, mode="block", palette=palette, annotate=False)
-        chart_content.append("─── Intraday Volume ───\n", style="bold gold1")
+        chart_content.append(f"─── {t('d_intraday_volume')} ───\n", style="bold gold1")
         chart_content.append(Text.from_ansi(vol_bars))
 
-    chart_content.append("\n\n─── Technical & Quant Indicators ───\n", style="bold gold1")
+    chart_content.append(f"\n\n─── {t('d_indicators')} ───\n", style="bold gold1")
     chart_content.append(f"• Moving Avg  : MA5={ma5:.2f} | MA10={ma10:.2f} | MA20={ma20:.2f}\n", style="dim white")
     chart_content.append(f"• Bollinger   : Upper={upper:.2f} | Mid={mid:.2f} | Lower={lower:.2f} (%b={pct_b:.2f})\n", style="dim white")
     chart_content.append(f"• MACD (12,26): DIF={last_dif:+.2f} | DEA={last_dea:+.2f} | Hist={last_hist:+.2f} ({'金叉 Bull' if last_hist>0 else '死叉 Bear'})\n", style="dim white")
@@ -161,14 +160,14 @@ def render_stock_detail(
                     [candle_view, Text("")]
                     if candle_view
                     else [
-                        Text("─── Smooth Price Curve ───", style="bold gold1"),
+                        Text(f"─── {t('d_curve')} ───", style="bold gold1"),
                         AutoCurve(price_list, rows=5, palette=palette),
                         Text(""),
                     ]
                 ),
                 chart_content,
             ),
-            title="📈 Technical Analysis & Curves (点击按钮或按 1-8 切换周期)", box=ROUNDED,
+            title=t("d_panel_tech"), box=ROUNDED,
         )
     )
 
@@ -180,18 +179,18 @@ def render_stock_detail(
 
     # 5-Level Order Book Table (买卖五档)
     book_table = Table(box=SIMPLE, expand=True, show_header=True, header_style="bold grey70")
-    book_table.add_column("Level", justify="left", style="bold white", width=6)
-    book_table.add_column("Price", justify="right", style=col_style, width=10)
-    book_table.add_column("Vol (Hands)", justify="right", style="dim cyan", width=12)
+    book_table.add_column(t("d_level"), justify="left", style="bold white", width=6)
+    book_table.add_column(t("d_price"), justify="right", style=col_style, width=10)
+    book_table.add_column(t("d_vol_hands"), justify="right", style="dim cyan", width=12)
 
     # Asks (Sell 5 to Sell 1 in reverse order)
     if tracker.asks:
         for idx in range(min(5, len(tracker.asks)) - 1, -1, -1):
             p, v = tracker.asks[idx]
-            book_table.add_row(f"卖 {idx + 1}", f"{p:.2f}", f"{v:,}")
+            book_table.add_row(f"{t('d_sell')} {idx + 1}", f"{p:.2f}", f"{v:,}")
     else:
         for i in range(5, 0, -1):
-            book_table.add_row(f"卖 {i}", f"{tracker.price + i*0.1:.2f}", f"{100*i:,}")
+            book_table.add_row(f"{t('d_sell')} {i}", f"{tracker.price + i*0.1:.2f}", f"{100*i:,}")
 
     book_table.add_row("────", "────────", "────────")
 
@@ -199,13 +198,13 @@ def render_stock_detail(
     if tracker.bids:
         for idx in range(min(5, len(tracker.bids))):
             p, v = tracker.bids[idx]
-            book_table.add_row(f"买 {idx + 1}", f"{p:.2f}", f"{v:,}")
+            book_table.add_row(f"{t('d_buy')} {idx + 1}", f"{p:.2f}", f"{v:,}")
     else:
         for i in range(1, 6):
-            book_table.add_row(f"买 {i}", f"{tracker.price - i*0.1:.2f}", f"{100*i:,}")
+            book_table.add_row(f"{t('d_buy')} {i}", f"{tracker.price - i*0.1:.2f}", f"{100*i:,}")
 
     root["middle"]["depth_and_flow"]["order_book"].update(
-        Panel(book_table, title="📊 5-Level Order Book (五档盘口)", box=ROUNDED)
+        Panel(book_table, title=t("d_panel_book"), box=ROUNDED)
     )
 
     # Capital Flow Breakdown
@@ -218,20 +217,21 @@ def render_stock_detail(
     main_col = "bright_red" if is_cn and main_val > 0 else ("bright_green" if not is_cn and main_val > 0 else ("bright_green" if is_cn else "bright_red"))
     main_sign = "+" if main_val > 0 else ""
     
-    flow_table.add_row("主力净流入", f"[{main_col}]{main_sign}{main_val:,.1f}万[/{main_col}]")
-    flow_table.add_row("超大单净额", f"{flow['super_large']/10000:+,.1f}万")
-    flow_table.add_row("散户净额", f"{flow['retail_net']/10000:+,.1f}万")
+    unit = t("d_unit")
+    flow_table.add_row(t("d_main_net"), f"[{main_col}]{main_sign}{main_val:,.1f}{unit}[/{main_col}]")
+    flow_table.add_row(t("d_super_large"), f"{flow['super_large']/10000:+,.1f}{unit}")
+    flow_table.add_row(t("d_retail"), f"{flow['retail_net']/10000:+,.1f}{unit}")
 
     root["middle"]["depth_and_flow"]["capital_flow"].update(
-        Panel(flow_table, title="💰 Capital Flow (资金流向)", box=ROUNDED)
+        Panel(flow_table, title=t("d_panel_flow"), box=ROUNDED)
     )
 
     # 3. Bottom: Investment Notes & Journal
     notes_list = notes if notes is not None else get_symbol_notes(tracker.symbol)
     notes_table = Table(box=SIMPLE, expand=True, show_header=True, header_style="bold gold1")
-    notes_table.add_column("Date / Time", justify="left", style="dim white", width=20)
-    notes_table.add_column("Tags", justify="center", style="bold cyan", width=14)
-    notes_table.add_column("Investment Logic & Trade Notes", justify="left", style="bright_white")
+    notes_table.add_column(t("d_notes_dt"), justify="left", style="dim white", width=20)
+    notes_table.add_column(t("d_notes_tags"), justify="center", style="bold cyan", width=14)
+    notes_table.add_column(t("d_notes_text"), justify="left", style="bright_white")
 
     if notes_list:
         for n in notes_list[:4]:  # Show latest 4 notes
@@ -239,13 +239,13 @@ def render_stock_detail(
             notes_table.add_row(n.get("timestamp", "-"), tag_str, n.get("text", ""))
     else:
         notes_table.add_row(
-            "No notes recorded yet.",
+            t("d_no_notes"),
             "[default]",
-            "Press 'n' in interactive TUI mode to add notes for this stock (e.g. Target price, Stop loss, Catalyst).",
+            t("d_no_notes_hint"),
         )
 
     root["bottom"].update(
-        Panel(notes_table, title="📝 Investment Notes & Strategy Log (按 'n' 编辑笔记)", box=ROUNDED)
+        Panel(notes_table, title=t("d_panel_notes"), box=ROUNDED)
     )
 
     return root

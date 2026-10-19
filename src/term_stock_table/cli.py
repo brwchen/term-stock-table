@@ -60,6 +60,12 @@ def main():
         help="Market color palette ('cn': Red up/Green down, 'us': Green up/Red down)"
     )
     parser.add_argument(
+        "--lang", "-L",
+        choices=["en", "zh"],
+        default=None,
+        help="UI language ('en' or 'zh'); saved choice from the TUI is used when omitted"
+    )
+    parser.add_argument(
         "--theme", "-t",
         choices=list(THEMES.keys()),
         default="classic_cn",
@@ -525,6 +531,7 @@ def main():
         palette=args.palette,
         use_real_data=(not args.sim),
         refresh_interval=args.interval,
+        lang=args.lang,
     )
     app.run()
 
