@@ -367,6 +367,8 @@ class StockTerminalApp(App):
     #main-scroll {
         width: 100%;
         height: 1fr;
+        overflow-x: auto;
+        overflow-y: auto;
     }
     #main-table-view {
         width: 100%;
@@ -619,6 +621,17 @@ class StockTerminalApp(App):
 
         self.update_view()
 
+    def fit_table_width(self, widget: Static, tbl) -> None:
+        """Let the table keep its natural minimum width so narrow terminals scroll horizontally."""
+        try:
+            from rich.measure import Measurement
+            natural = sum((c.min_width or 0) for c in tbl.columns) + 3 * len(tbl.columns) + 1
+            needed = max(natural, Measurement.get(self.console, self.console.options, tbl).minimum) + 2
+            avail = self.query_one("#main-scroll").size.width
+            widget.styles.width = max(needed, avail) if avail else "100%"
+        except Exception:
+            widget.styles.width = "100%"
+
     def update_view(self) -> None:
         """Render main stock table, Portfolio view, or Boss mode camouflage."""
         try:
@@ -652,6 +665,7 @@ class StockTerminalApp(App):
             overlay_end()
             self.overlay_items = queue or []
             view_widget.update(tbl)
+            self.fit_table_width(view_widget, tbl)
 
     def action_toggle_boss(self) -> None:
         """Instantly toggle Boss Mode disguise."""
