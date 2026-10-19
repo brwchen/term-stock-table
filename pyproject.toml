@@ -48,6 +48,7 @@ dependencies = [
     "term-sparkline>=0.7.0",
     "rich>=12.0.0",
     "textual>=0.40.0",
+    "pypinyin>=0.50",
 ]
 
 [project.optional-dependencies]

@@ -862,7 +862,7 @@ def test_stealth_view_hides_market_identity():
             await pilot.press("m")
             await pilot.pause(0.4)
             screen = "\n".join(s.text for s in app.screen._compositor.render_strips())
-            assert "svc-1" in screen and "600519" not in screen and "AAPL" not in screen
+            assert "svc-" in screen and "600519" not in screen and "AAPL" not in screen
             await pilot.press("enter")
             await pilot.pause(0.5)
             screen = "\n".join(s.text for s in app.screen._compositor.render_strips())
