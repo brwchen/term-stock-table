@@ -4,7 +4,7 @@ import dataclasses
 import sys
 from typing import List, Optional, Dict, Any
 from textual.app import App, ComposeResult
-from textual.containers import Container, Vertical, Horizontal, VerticalScroll
+from textual.containers import Container, Vertical, Horizontal, VerticalScroll, ScrollableContainer
 from textual.geometry import Region
 from textual.widgets import Header, Footer, Static, Input, Button, Label, DataTable
 from textual.screen import ModalScreen, Screen
@@ -160,10 +160,34 @@ class AddStockModal(ModalScreen[None]):
             self.dismiss()
 
 
-class RadarModal(ModalScreen[None]):
+class DetailScroll(ScrollableContainer, can_focus=False):
+    """Scroll container for modal content; keys are handled by the modal."""
+
+
+class ScrollKeysMixin:
+    """Keyboard scrolling for the detail-style view inside a modal."""
+
+    SCROLL_BINDINGS = [
+        Binding("q", "app.quit", "Quit"),
+        Binding("up", "scroll_view('up')", show=False),
+        Binding("down", "scroll_view('down')", show=False),
+        Binding("left", "scroll_view('left')", show=False),
+        Binding("right", "scroll_view('right')", show=False),
+        Binding("pageup", "scroll_view('page_up')", show=False),
+        Binding("pagedown", "scroll_view('page_down')", show=False),
+        Binding("home", "scroll_view('home')", show=False),
+        Binding("end", "scroll_view('end')", show=False),
+    ]
+
+    def action_scroll_view(self, direction: str) -> None:
+        view = self.query_one("#detail-scroll")
+        getattr(view, f"scroll_{direction}")(animate=False)
+
+
+class RadarModal(ScrollKeysMixin, ModalScreen[None]):
     """Modal screen for market sentiment and anomaly radar."""
 
-    BINDINGS = [Binding("q", "app.quit", "Quit")]
+    BINDINGS = ScrollKeysMixin.SCROLL_BINDINGS
 
     def __init__(self, palette: str = "cn"):
         super().__init__()
@@ -172,7 +196,8 @@ class RadarModal(ModalScreen[None]):
     def compose(self) -> ComposeResult:
         radar = MarketRadarTracker(palette=self.palette)
         with Vertical(id="detail-container"):
-            yield Static(radar.render_full_radar_view(), id="detail-view")
+            with DetailScroll(id="detail-scroll"):
+                yield Static(radar.render_full_radar_view(), id="detail-view")
             with Horizontal(id="detail-footer"):
                 yield Button(t("close"), id="close-radar-btn", variant="default")
 
@@ -183,10 +208,10 @@ class RadarModal(ModalScreen[None]):
         self.dismiss()
 
 
-class SectorModal(ModalScreen[None]):
+class SectorModal(ScrollKeysMixin, ModalScreen[None]):
     """Modal screen for sector heatmap and rankings."""
 
-    BINDINGS = [Binding("q", "app.quit", "Quit")]
+    BINDINGS = ScrollKeysMixin.SCROLL_BINDINGS
 
     def __init__(self, palette: str = "cn"):
         super().__init__()
@@ -195,7 +220,8 @@ class SectorModal(ModalScreen[None]):
     def compose(self) -> ComposeResult:
         sec = SectorHeatmapTracker(palette=self.palette)
         with Vertical(id="detail-container"):
-            yield Static(sec.render_full_sector_view(), id="detail-view")
+            with DetailScroll(id="detail-scroll"):
+                yield Static(sec.render_full_sector_view(), id="detail-view")
             with Horizontal(id="detail-footer"):
                 yield Button(t("close"), id="close-sector-btn", variant="default")
 
@@ -206,10 +232,10 @@ class SectorModal(ModalScreen[None]):
         self.dismiss()
 
 
-class BacktestModal(ModalScreen[None]):
+class BacktestModal(ScrollKeysMixin, ModalScreen[None]):
     """Modal screen for strategy backtesting."""
 
-    BINDINGS = [Binding("q", "app.quit", "Quit")]
+    BINDINGS = ScrollKeysMixin.SCROLL_BINDINGS
 
     def __init__(self, tracker: StockDataTracker, palette: str = "cn"):
         super().__init__()
@@ -219,7 +245,8 @@ class BacktestModal(ModalScreen[None]):
     def compose(self) -> ComposeResult:
         bt = StrategyBacktester(self.tracker.symbol, self.tracker.name, palette=self.palette)
         with Vertical(id="detail-container"):
-            yield Static(bt.render_backtest_panel(), id="detail-view")
+            with DetailScroll(id="detail-scroll"):
+                yield Static(bt.render_backtest_panel(), id="detail-view")
             with Horizontal(id="detail-footer"):
                 yield Button(t("close"), id="close-bt-btn", variant="default")
 
@@ -230,10 +257,10 @@ class BacktestModal(ModalScreen[None]):
         self.dismiss()
 
 
-class ThemeModal(ModalScreen[None]):
+class ThemeModal(ScrollKeysMixin, ModalScreen[None]):
     """Modal screen for selecting theme presets."""
 
-    BINDINGS = [Binding("q", "app.quit", "Quit")]
+    BINDINGS = ScrollKeysMixin.SCROLL_BINDINGS
 
     def compose(self) -> ComposeResult:
         with Vertical(id="alert-dialog"):
@@ -256,10 +283,10 @@ class ThemeModal(ModalScreen[None]):
         self.dismiss()
 
 
-class FormulaModal(ModalScreen[None]):
+class FormulaModal(ScrollKeysMixin, ModalScreen[None]):
     """Modal screen for custom indicator formulas."""
 
-    BINDINGS = [Binding("q", "app.quit", "Quit")]
+    BINDINGS = ScrollKeysMixin.SCROLL_BINDINGS
 
     def compose(self) -> ComposeResult:
         formulas = FormulaManager.load_formulas()
@@ -276,10 +303,10 @@ class FormulaModal(ModalScreen[None]):
         self.dismiss()
 
 
-class DetailModal(ModalScreen[None]):
+class DetailModal(ScrollKeysMixin, ModalScreen[None]):
     """Modal screen for comprehensive stock detail view with switchable chart periods."""
 
-    BINDINGS = [Binding("q", "app.quit", "Quit")]
+    BINDINGS = ScrollKeysMixin.SCROLL_BINDINGS
 
     PERIODS = ["intraday", "m5", "m15", "m30", "m60", "day", "week", "month"]
 
@@ -293,7 +320,8 @@ class DetailModal(ModalScreen[None]):
 
     def compose(self) -> ComposeResult:
         with Vertical(id="detail-container"):
-            yield Static(id="detail-view")
+            with DetailScroll(id="detail-scroll"):
+                yield Static(id="detail-view")
             with Horizontal(id="detail-periods"):
                 for i, p in enumerate(self.PERIODS, 1):
                     yield Button(f"{period_label(p)} ({i})", id=f"period-{p}", variant="default")
@@ -375,6 +403,14 @@ class StockTerminalApp(App):
     CSS = """
     Screen {
         background: #0f1117;
+        scrollbar-size: 1 1;
+        scrollbar-background: #0f1117;
+        scrollbar-background-hover: #0f1117;
+        scrollbar-background-active: #0f1117;
+        scrollbar-color: #3b4252;
+        scrollbar-color-hover: #5e6a82;
+        scrollbar-color-active: #81a1c1;
+        scrollbar-corner-color: #0f1117;
     }
     #main-scroll {
         width: 100%;
@@ -403,9 +439,14 @@ class StockTerminalApp(App):
         padding: 1;
         align: center middle;
     }
-    #detail-view {
+    #detail-scroll {
         width: 100%;
         height: 1fr;
+    }
+    #detail-view {
+        width: auto;
+        min-width: 100%;
+        height: auto;
     }
     #detail-periods {
         height: 3;
