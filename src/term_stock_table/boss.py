@@ -86,7 +86,7 @@ def _stock_process_row(tr, selected_symbol):
         f"{prices[-1]:,.2f}", "12M", "S",
         Text(f"{pct:+.2f}", style=tone), "0.4", "00:12.07",
         smart_spark(prices[-60:], length=20, up=pct >= 0),
-        f"{service_name(tr.symbol, tr.name)}-worker",
+        service_name(tr.symbol, tr.name).removeprefix("svc-").upper(),
     )
     return tuple(Text(c, style=style) if isinstance(c, str) else c for c in row)
 
