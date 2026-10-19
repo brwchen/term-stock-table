@@ -18,10 +18,54 @@ from .config import (
     get_symbol_notes,
     load_settings,
     save_settings,
+    load_portfolio,
+    load_alerts,
+    save_alert,
 )
 from .table import create_stock_table
 from .detail import render_stock_detail
 from .boss import render_boss_view, PROFILES
+from .portfolio import calculate_portfolio_pnl, create_portfolio_table
+from .alerts import evaluate_alerts
+from .market import render_indices_banner
+
+
+class AlertModal(ModalScreen[None]):
+    """Modal dialog for configuring price and volatility alerts."""
+
+    def __init__(self, symbol: str, name: str):
+        super().__init__()
+        self.symbol = symbol
+        self.stock_name = name
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="alert-dialog"):
+            yield Label(f"🔔 Set Price Alert for {self.stock_name} ({self.symbol})", id="alert-title")
+            yield Input(placeholder="Target High Price (e.g. 1800.0)", id="high-input")
+            yield Input(placeholder="Stop Low Price (e.g. 1200.0)", id="low-input")
+            yield Input(placeholder="Max Volatility % (e.g. 3.0)", id="pct-input")
+            with Horizontal(id="alert-buttons"):
+                yield Button("Save Alert (Enter)", variant="primary", id="save-alert-btn")
+                yield Button("Cancel (Esc)", variant="default", id="cancel-alert-btn")
+
+    def on_mount(self) -> None:
+        self.query_one("#high-input", Input).focus()
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "save-alert-btn":
+            h_text = self.query_one("#high-input", Input).value.strip()
+            l_text = self.query_one("#low-input", Input).value.strip()
+            p_text = self.query_one("#pct-input", Input).value.strip()
+            
+            high_val = float(h_text) if h_text else None
+            low_val = float(l_text) if l_text else None
+            pct_val = float(p_text) if p_text else None
+            
+            save_alert(self.symbol, target_high=high_val, target_low=low_val, max_change_pct=pct_val)
+            self.app.notify(f"Alert configured for {self.symbol}!")
+            self.dismiss()
+        else:
+            self.dismiss()
 
 
 class NoteModal(ModalScreen[None]):
@@ -104,11 +148,13 @@ class DetailModal(ModalScreen[None]):
         super().__init__()
         self.tracker = tracker
         self.palette = palette
+        self.show_candle = False
 
     def compose(self) -> ComposeResult:
         with Vertical(id="detail-container"):
             yield Static(id="detail-view")
             with Horizontal(id="detail-footer"):
+                yield Button("K-Line / Sparkline ('k')", id="detail-candle-btn", variant="warning")
                 yield Button("Add Note ('n')", id="detail-note-btn", variant="primary")
                 yield Button("Close (Esc/Enter)", id="detail-close-btn", variant="default")
 
@@ -117,12 +163,20 @@ class DetailModal(ModalScreen[None]):
 
     def update_content(self) -> None:
         notes = get_symbol_notes(self.tracker.symbol)
-        layout = render_stock_detail(self.tracker, palette=self.palette, notes=notes)
+        layout = render_stock_detail(
+            self.tracker,
+            palette=self.palette,
+            notes=notes,
+            show_candlestick=self.show_candle,
+        )
         self.query_one("#detail-view", Static).update(layout)
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "detail-note-btn":
             self.app.push_screen(NoteModal(self.tracker.symbol, self.tracker.name))
+        elif event.button.id == "detail-candle-btn":
+            self.show_candle = not self.show_candle
+            self.update_content()
         else:
             self.dismiss()
 
@@ -134,6 +188,10 @@ class DetailModal(ModalScreen[None]):
 
     def key_n(self) -> None:
         self.app.push_screen(NoteModal(self.tracker.symbol, self.tracker.name))
+
+    def key_k(self) -> None:
+        self.show_candle = not self.show_candle
+        self.update_content()
 
 
 class StockTerminalApp(App):
@@ -148,7 +206,7 @@ class StockTerminalApp(App):
         height: 100%;
         padding: 0 1;
     }
-    #note-dialog, #add-dialog {
+    #note-dialog, #add-dialog, #alert-dialog {
         padding: 1 2;
         background: #1a202c;
         border: solid $primary;
@@ -172,7 +230,7 @@ class StockTerminalApp(App):
         height: 3;
         align: right middle;
     }
-    #note-buttons, #add-buttons {
+    #note-buttons, #add-buttons, #alert-buttons {
         margin-top: 1;
         align: right middle;
     }
@@ -184,12 +242,16 @@ class StockTerminalApp(App):
     BINDINGS = [
         Binding("b", "toggle_boss", "Boss Key (摸鱼模式)", priority=True),
         Binding("escape", "handle_escape", "Escape", priority=True),
-        Binding("tab", "cycle_boss_profile", "Next Boss Profile"),
+        Binding("tab", "cycle_boss_profile", "Next Boss Disguise"),
         Binding("enter", "show_detail", "Stock Detail"),
         Binding("n", "add_note", "Add Note"),
+        Binding("l", "set_alert", "Price Alert"),
         Binding("a", "add_stock", "Add Stock"),
         Binding("slash", "add_stock", "Search/Add"),
         Binding("d", "delete_stock", "Delete Stock"),
+        Binding("s", "cycle_sort", "Sort Column"),
+        Binding("r", "reverse_sort", "Reverse Sort"),
+        Binding("P", "toggle_portfolio", "Portfolio View"),
         Binding("p", "toggle_palette", "CN/US Palette"),
         Binding("q", "quit", "Quit"),
     ]
@@ -211,8 +273,13 @@ class StockTerminalApp(App):
         ]
         self.selected_index: int = 0
         self.is_boss_mode: bool = False
+        self.is_portfolio_mode: bool = False
         self.boss_profile_idx: int = 0
+        self.sort_columns = [None, "change_pct", "price", "volume", "amount", "amplitude", "pe"]
+        self.sort_col_idx: int = 0
+        self.sort_descending: bool = True
         self.is_live: bool = False
+        self.alerts_triggered: Dict[str, List[str]] = {}
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
@@ -220,7 +287,7 @@ class StockTerminalApp(App):
         yield Footer()
 
     def on_mount(self) -> None:
-        self.title = "term-stock-table (Professional Financial Terminal)"
+        self.title = "term-stock-table (Professional Financial Workstation)"
         self.update_view()
         self.set_interval(self.refresh_interval, self.refresh_market_data)
 
@@ -262,10 +329,14 @@ class StockTerminalApp(App):
             for tr in self.trackers:
                 tr.tick_simulation()
 
+        # Check alerts
+        quotes_dict_list = [tr.to_dict() for tr in self.trackers]
+        self.alerts_triggered = evaluate_alerts(quotes_dict_list, trigger_notification=True)
+
         self.update_view()
 
     def update_view(self) -> None:
-        """Render either the main stock table or the Boss mode camouflage."""
+        """Render main stock table, Portfolio view, or Boss mode camouflage."""
         try:
             view_widget = self.query_one("#main-table-view", Static)
         except Exception:
@@ -275,12 +346,21 @@ class StockTerminalApp(App):
             prof = PROFILES[self.boss_profile_idx % len(PROFILES)]
             renderable = render_boss_view(prof, trackers=self.trackers)
             view_widget.update(renderable)
+        elif self.is_portfolio_mode:
+            port = load_portfolio()
+            p_data = calculate_portfolio_pnl([tr.to_dict() for tr in self.trackers], port)
+            tbl = create_portfolio_table(p_data, palette=self.palette)
+            view_widget.update(tbl)
         else:
+            sort_col = self.sort_columns[self.sort_col_idx]
             tbl = create_stock_table(
                 self.trackers,
                 palette=self.palette,
                 monochrome=False,
                 is_live=self.is_live,
+                sort_by=sort_col,
+                reverse=self.sort_descending,
+                alerts_triggered=self.alerts_triggered,
             )
             view_widget.update(tbl)
 
@@ -302,6 +382,25 @@ class StockTerminalApp(App):
             self.boss_profile_idx = (self.boss_profile_idx + 1) % len(PROFILES)
             self.update_view()
 
+    def action_toggle_portfolio(self) -> None:
+        """Toggle between Watchlist and Portfolio asset view."""
+        self.is_portfolio_mode = not self.is_portfolio_mode
+        self.notify(f"Mode: {'Portfolio Holdings' if self.is_portfolio_mode else 'Watchlist'}")
+        self.update_view()
+
+    def action_cycle_sort(self) -> None:
+        """Cycle sorting column."""
+        self.sort_col_idx = (self.sort_col_idx + 1) % len(self.sort_columns)
+        curr = self.sort_columns[self.sort_col_idx] or "Default"
+        self.notify(f"Sorted by: {curr.upper()}")
+        self.update_view()
+
+    def action_reverse_sort(self) -> None:
+        """Reverse sorting order."""
+        self.sort_descending = not self.sort_descending
+        self.notify(f"Order: {'Descending (▼)' if self.sort_descending else 'Ascending (▲)'}")
+        self.update_view()
+
     def action_show_detail(self) -> None:
         """Show detail view for highlighted stock."""
         if self.trackers:
@@ -313,6 +412,12 @@ class StockTerminalApp(App):
         if self.trackers:
             tr = self.trackers[self.selected_index % len(self.trackers)]
             self.push_screen(NoteModal(tr.symbol, tr.name))
+
+    def action_set_alert(self) -> None:
+        """Open alert configuration modal."""
+        if self.trackers:
+            tr = self.trackers[self.selected_index % len(self.trackers)]
+            self.push_screen(AlertModal(tr.symbol, tr.name))
 
     def action_add_stock(self) -> None:
         """Open add stock modal."""

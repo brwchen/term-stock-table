@@ -233,3 +233,26 @@ class StockDataTracker:
     @property
     def change_pct(self) -> float:
         return (self.change / self.prev_close * 100.0) if self.prev_close else 0.0
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert tracker status to dictionary representation."""
+        return {
+            "symbol": self.symbol,
+            "name": self.name,
+            "price": self.price,
+            "prev_close": self.prev_close,
+            "open": self.open,
+            "high": self.high,
+            "low": self.low,
+            "change": self.change,
+            "change_pct": self.change_pct,
+            "volume": self.volume,
+            "amount": self.amount,
+            "turnover_rate": self.turnover_rate,
+            "pe": self.pe,
+            "pb": self.pb,
+            "amplitude": self.amplitude,
+            "bids": list(self.bids),
+            "asks": list(self.asks),
+            "is_real": self.is_real,
+        }

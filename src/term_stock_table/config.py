@@ -8,6 +8,8 @@ DEFAULT_CONFIG_DIR = Path.home() / ".term_stock"
 WATCHLIST_FILE = DEFAULT_CONFIG_DIR / "watchlist.json"
 NOTES_FILE = DEFAULT_CONFIG_DIR / "notes.json"
 SETTINGS_FILE = DEFAULT_CONFIG_DIR / "settings.json"
+PORTFOLIO_FILE = DEFAULT_CONFIG_DIR / "portfolio.json"
+ALERTS_FILE = DEFAULT_CONFIG_DIR / "alerts.json"
 
 DEFAULT_WATCHLIST = [
     "600519",  # 贵州茅台
@@ -137,3 +139,91 @@ def save_settings(settings: Dict[str, Any]) -> None:
     ensure_config_dir()
     with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
         json.dump(settings, f, ensure_ascii=False, indent=2)
+
+
+def load_portfolio() -> Dict[str, Dict[str, Any]]:
+    """Load user portfolio positions."""
+    ensure_config_dir()
+    if PORTFOLIO_FILE.exists():
+        try:
+            with open(PORTFOLIO_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {}
+
+
+def save_position(symbol: str, shares: float, cost: float, currency: str = "CNY") -> None:
+    """Add or update a portfolio position."""
+    portfolio = load_portfolio()
+    s_clean = symbol.strip().upper()
+    portfolio[s_clean] = {
+        "shares": float(shares),
+        "cost": float(cost),
+        "currency": currency.upper(),
+    }
+    ensure_config_dir()
+    with open(PORTFOLIO_FILE, "w", encoding="utf-8") as f:
+        json.dump(portfolio, f, ensure_ascii=False, indent=2)
+
+
+def remove_position(symbol: str) -> bool:
+    """Remove a position from portfolio."""
+    portfolio = load_portfolio()
+    s_clean = symbol.strip().upper()
+    if s_clean in portfolio:
+        del portfolio[s_clean]
+        ensure_config_dir()
+        with open(PORTFOLIO_FILE, "w", encoding="utf-8") as f:
+            json.dump(portfolio, f, ensure_ascii=False, indent=2)
+        return True
+    return False
+
+
+def load_alerts() -> Dict[str, Dict[str, Any]]:
+    """Load price and volatility alert thresholds."""
+    ensure_config_dir()
+    if ALERTS_FILE.exists():
+        try:
+            with open(ALERTS_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {}
+
+
+def save_alert(
+    symbol: str,
+    target_high: Optional[float] = None,
+    target_low: Optional[float] = None,
+    max_change_pct: Optional[float] = None,
+) -> None:
+    """Add or update price alert configuration for a stock symbol."""
+    alerts = load_alerts()
+    s_clean = symbol.strip().upper()
+    current = alerts.get(s_clean, {})
+    if target_high is not None:
+        current["target_high"] = float(target_high)
+    if target_low is not None:
+        current["target_low"] = float(target_low)
+    if max_change_pct is not None:
+        current["max_change_pct"] = float(max_change_pct)
+    current["enabled"] = True
+    alerts[s_clean] = current
+    ensure_config_dir()
+    with open(ALERTS_FILE, "w", encoding="utf-8") as f:
+        json.dump(alerts, f, ensure_ascii=False, indent=2)
+
+
+def remove_alert(symbol: str) -> bool:
+    """Remove an alert for a stock symbol."""
+    alerts = load_alerts()
+    s_clean = symbol.strip().upper()
+    if s_clean in alerts:
+        del alerts[s_clean]
+        ensure_config_dir()
+        with open(ALERTS_FILE, "w", encoding="utf-8") as f:
+            json.dump(alerts, f, ensure_ascii=False, indent=2)
+        return True
+    return False
+

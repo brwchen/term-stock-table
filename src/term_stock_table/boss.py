@@ -7,7 +7,7 @@ from rich.panel import Panel
 from rich.text import Text
 from rich.box import SIMPLE, SQUARE, ROUNDED
 
-PROFILES = ["devops", "kubectl", "nginx", "monochrome"]
+PROFILES = ["devops", "kubectl", "nginx", "cpp", "git", "python", "monochrome"]
 
 
 def render_devops_top() -> Table:
@@ -144,6 +144,112 @@ def render_monochrome_table(trackers) -> Table:
     return table
 
 
+def render_cpp_build() -> Panel:
+    """Disguise as CMake / C++ compilation build output."""
+    text = Text()
+    lines = [
+        "[ 42%] Building CXX object src/core/CMakeFiles/core.dir/memory_allocator.cpp.o",
+        "[ 48%] Building CXX object src/core/CMakeFiles/core.dir/thread_pool.cpp.o",
+        "[ 54%] Building CXX object src/engine/CMakeFiles/engine.dir/render_pipeline.cpp.o",
+        "[ 61%] Building CXX object src/engine/CMakeFiles/engine.dir/shader_compiler.cpp.o",
+        "[ 68%] Building CXX object src/net/CMakeFiles/net.dir/async_socket.cpp.o",
+        "[ 75%] Building CXX object src/net/CMakeFiles/net.dir/tls_session.cpp.o",
+        "[ 82%] Linking CXX static library libcore.a",
+        "[ 88%] Linking CXX shared library libengine.dylib",
+        "[ 94%] Building CXX object src/main/CMakeFiles/app.dir/main.cpp.o",
+        "[100%] Linking CXX executable bin/distributed_coordinator",
+        "Built target distributed_coordinator [Success: 0 warnings, 0 errors]",
+    ]
+    for l in lines:
+        if "100%" in l or "Success" in l:
+            text.append(l + "\n", style="bold green")
+        elif "Building" in l:
+            text.append(l + "\n", style="dim white")
+        else:
+            text.append(l + "\n", style="cyan")
+
+    return Panel(
+        text,
+        title="ninja -C build/release -j 12 (Target: distributed_coordinator)",
+        title_align="left",
+        box=ROUNDED,
+        style="dim grey70",
+    )
+
+
+def render_git_diff() -> Panel:
+    """Disguise as git diff and code review output."""
+    text = Text()
+    diff_lines = [
+        "diff --git a/src/auth/session.go b/src/auth/session.go",
+        "index 8a3f12b..4e9c701 100644",
+        "--- a/src/auth/session.go",
+        "+++ b/src/auth/session.go",
+        "@@ -142,8 +142,12 @@ func (s *SessionManager) ValidateToken(token string) (*Claims, error) {",
+        " \tif claims.ExpiresAt < time.Now().Unix() {",
+        "-\t\treturn nil, ErrTokenExpired",
+        "+\t\tlog.Warn(\"token expired\", zap.String(\"sub\", claims.Subject))",
+        "+\t\treturn nil, fmt.Errorf(\"%w: timestamp=%d\", ErrTokenExpired, claims.ExpiresAt)",
+        " \t}",
+        "+",
+        "+\t// Verify cryptographic signature with rotation key",
+        "+\tif err := s.keyRing.VerifySignature(token, claims); err != nil {",
+        "+\t\treturn nil, fmt.Errorf(\"signature verification failed: %w\", err)",
+        "+\t}",
+        " \treturn claims, nil",
+        " }",
+    ]
+    for dl in diff_lines:
+        if dl.startswith("+") and not dl.startswith("+++"):
+            text.append(dl + "\n", style="green")
+        elif dl.startswith("-") and not dl.startswith("---"):
+            text.append(dl + "\n", style="red")
+        elif dl.startswith("@@"):
+            text.append(dl + "\n", style="cyan")
+        elif dl.startswith("diff") or dl.startswith("index"):
+            text.append(dl + "\n", style="bold white")
+        else:
+            text.append(dl + "\n", style="dim white")
+
+    return Panel(
+        text,
+        title="git diff HEAD~1..HEAD (feat: security token rotation)",
+        title_align="left",
+        box=ROUNDED,
+        style="dim grey70",
+    )
+
+
+def render_python_train() -> Panel:
+    """Disguise as PyTorch Deep Learning training loss loop."""
+    text = Text()
+    now_ts = time.strftime("%H:%M:%S")
+    train_lines = [
+        f"[{now_ts}] [INFO] Initializing TransformerBackbone(num_layers=24, heads=16, d_model=1024)",
+        f"[{now_ts}] Epoch [18/50] Iter [1400/4200] lr: 1.45e-4 | Loss: 0.2842 | Perplexity: 1.328 | GradNorm: 0.84",
+        f"[{now_ts}] Epoch [18/50] Iter [1600/4200] lr: 1.44e-4 | Loss: 0.2790 | Perplexity: 1.321 | GradNorm: 0.79",
+        f"[{now_ts}] Epoch [18/50] Iter [1800/4200] lr: 1.42e-4 | Loss: 0.2715 | Perplexity: 1.312 | GradNorm: 0.81",
+        f"[{now_ts}] Epoch [18/50] Iter [2000/4200] lr: 1.40e-4 | Loss: 0.2680 | Perplexity: 1.307 | GradNorm: 0.76",
+        f"[{now_ts}] [EVAL] Val Loss: 0.2910 | Top-1 Accuracy: 94.82% | BLEU-4: 41.25",
+        f"[{now_ts}] [CHECKPOINT] Best model saved to checkpoints/model_epoch18_val948.pt",
+    ]
+    for tl in train_lines:
+        if "[CHECKPOINT]" in tl:
+            text.append(tl + "\n", style="bold green")
+        elif "[EVAL]" in tl:
+            text.append(tl + "\n", style="bold yellow")
+        else:
+            text.append(tl + "\n", style="dim white")
+
+    return Panel(
+        text,
+        title="python3 train_distributed.py --world_size=8 --dataset=fin_corpus",
+        title_align="left",
+        box=ROUNDED,
+        style="dim grey70",
+    )
+
+
 def render_boss_view(profile: str = "devops", trackers=None):
     """Render selected boss mode camouflage profile."""
     p = profile.lower()
@@ -153,6 +259,77 @@ def render_boss_view(profile: str = "devops", trackers=None):
         return render_kubectl_pods()
     elif p == "nginx":
         return render_nginx_logs()
+    elif p == "cpp":
+        return render_cpp_build()
+    elif p == "git":
+        return render_git_diff()
+    elif p == "python":
+        return render_python_train()
     elif p == "monochrome" and trackers:
         return render_monochrome_table(trackers)
     return render_devops_top()
+
+
+def export_daily_review(
+    trackers,
+    notes: Optional[dict] = None,
+    portfolio: Optional[dict] = None,
+    output_path: Optional[str] = None,
+) -> str:
+    """
+    Generate and export a comprehensive daily review markdown report.
+    """
+    import datetime
+    now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    lines = [
+        f"# 📈 Daily Financial Review & Trading Journal",
+        f"> Generated on {now_str} via `term-stock-table`\n",
+        "## 1. Watchlist Overview\n",
+        "| Symbol | Name | Price | Change% | Change | Volume | Amount | P/E |",
+        "| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |",
+    ]
+    
+    for tr in trackers:
+        sign = "+" if tr.change >= 0 else ""
+        lines.append(
+            f"| `{tr.symbol}` | {tr.name} | {tr.price:.2f} | {sign}{tr.change_pct:.2f}% | {sign}{tr.change:.2f} | {tr.volume:,} | {tr.amount:.1f}万 | {tr.pe or '-'} |"
+        )
+        
+    if portfolio:
+        lines.extend([
+            "\n## 2. Portfolio Valuation Summary\n",
+            "| Symbol | Shares | Cost Price | Current Price | Float PnL | Return% |",
+            "| :--- | :--- | :--- | :--- | :--- | :--- |",
+        ])
+        for sym, pos in portfolio.items():
+            cost = pos.get("cost", 0)
+            shares = pos.get("shares", 0)
+            cur = cost
+            for tr in trackers:
+                if tr.symbol.upper() == sym.upper():
+                    cur = tr.price
+                    break
+            pnl = (cur - cost) * shares
+            ret_pct = ((cur - cost) / cost * 100.0) if cost > 0 else 0.0
+            pnl_sign = "+" if pnl >= 0 else ""
+            lines.append(
+                f"| `{sym}` | {shares:,.0f} | {cost:.2f} | {cur:.2f} | {pnl_sign}{pnl:,.2f} | {pnl_sign}{ret_pct:.2f}% |"
+            )
+            
+    if notes:
+        lines.extend(["\n## 3. Investment Notes & Strategy Log\n"])
+        for sym, note_list in notes.items():
+            if not note_list:
+                continue
+            lines.append(f"### `{sym}` Notes")
+            for n in note_list[:5]:
+                lines.append(f"- **[{n.get('timestamp', '')}]**: {n.get('text', '')}")
+            lines.append("")
+            
+    content = "\n".join(lines)
+    if output_path:
+        with open(output_path, "w", encoding="utf-8") as f:
+            f.write(content)
+            
+    return content
+

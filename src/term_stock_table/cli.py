@@ -13,10 +13,19 @@ from .config import (
     save_note,
     load_notes,
     get_symbol_notes,
+    load_portfolio,
+    save_position,
+    remove_position,
+    load_alerts,
+    save_alert,
+    remove_alert,
 )
 from .table import create_stock_table
 from .detail import render_stock_detail
-from .boss import render_boss_view, PROFILES
+from .boss import render_boss_view, PROFILES, export_daily_review
+from .portfolio import calculate_portfolio_pnl, create_portfolio_table
+from .alerts import evaluate_alerts
+from .market import render_indices_banner
 from .tui import StockTerminalApp
 
 
@@ -64,6 +73,63 @@ def main():
         help="Force offline simulation engine instead of live quote API"
     )
     parser.add_argument(
+        "--sort",
+        choices=["change_pct", "price", "volume", "amount", "amplitude", "turnover_rate", "symbol", "pe"],
+        default=None,
+        help="Sort table by specific column"
+    )
+    parser.add_argument(
+        "--asc",
+        action="store_true",
+        help="Sort in ascending order (default is descending)"
+    )
+    parser.add_argument(
+        "--indices",
+        action="store_true",
+        help="Display global major indices overview banner"
+    )
+    parser.add_argument(
+        "--portfolio",
+        action="store_true",
+        help="View portfolio asset valuation and real-time floating PnL table"
+    )
+    parser.add_argument(
+        "--position",
+        nargs=3,
+        metavar=("SYMBOL", "SHARES", "COST"),
+        help="Set or update portfolio position (e.g. --position 600519 100 1350.0)"
+    )
+    parser.add_argument(
+        "--remove-position",
+        type=str,
+        metavar="SYMBOL",
+        help="Remove symbol position from portfolio"
+    )
+    parser.add_argument(
+        "--alert",
+        nargs="+",
+        metavar=("SYMBOL", "PARAMS"),
+        help="Set price alert: --alert SYMBOL [high=VAL] [low=VAL] [pct=VAL]"
+    )
+    parser.add_argument(
+        "--alerts",
+        action="store_true",
+        help="View all configured price and volatility alerts"
+    )
+    parser.add_argument(
+        "--remove-alert",
+        type=str,
+        metavar="SYMBOL",
+        help="Remove price alert for a symbol"
+    )
+    parser.add_argument(
+        "--export-daily",
+        nargs="?",
+        const="daily_review.md",
+        metavar="FILEPATH",
+        help="Export comprehensive daily review markdown report"
+    )
+    parser.add_argument(
         "--boss", "-b",
         action="store_true",
         help="Launch directly in Boss Mode (摸鱼伪装模式)"
@@ -72,7 +138,7 @@ def main():
         "--boss-profile",
         choices=PROFILES,
         default="devops",
-        help="Camouflage profile for Boss Mode ('devops', 'kubectl', 'nginx', 'monochrome')"
+        help="Camouflage profile for Boss Mode ('devops', 'kubectl', 'nginx', 'cpp', 'git', 'python', 'monochrome')"
     )
     parser.add_argument(
         "--add",
@@ -114,7 +180,13 @@ def main():
     args = parser.parse_args()
     console = Console()
 
-    # 1. Watchlist operations
+    # 1. Indices Banner
+    if args.indices:
+        banner = render_indices_banner(palette=args.palette)
+        console.print(banner)
+        return
+
+    # 2. Watchlist operations
     if args.add:
         if add_to_watchlist(args.add):
             console.print(f"[bold green]✓ Added {args.add.upper()} to watchlist.[/]")
@@ -134,7 +206,76 @@ def main():
         console.print(f"[bold cyan]Persistent Watchlist ({len(wl)} items):[/] {', '.join(wl)}")
         return
 
-    # 2. Notes operations
+    # 3. Position and Portfolio operations
+    if args.position:
+        sym, shares, cost = args.position
+        save_position(sym, float(shares), float(cost))
+        console.print(f"[bold green]✓ Portfolio Position Saved:[/] {sym.upper()} - {shares} shares @ ¥{float(cost):.2f}")
+        return
+
+    if args.remove_position:
+        if remove_position(args.remove_position):
+            console.print(f"[bold green]✓ Position removed for {args.remove_position.upper()}.[/]")
+        else:
+            console.print(f"[yellow]! No position found for {args.remove_position.upper()}.[/]")
+        return
+
+    if args.portfolio:
+        port = load_portfolio()
+        symbols = list(port.keys()) or load_watchlist()
+        quotes_dict = {}
+        if not args.sim and symbols:
+            quotes_dict = fetch_live_quotes(symbols, timeout=2.0)
+        quotes_list = []
+        for s in symbols:
+            if s in quotes_dict:
+                quotes_list.append(quotes_dict[s])
+            else:
+                tr = StockDataTracker(s)
+                quotes_list.append(tr.to_dict())
+        p_data = calculate_portfolio_pnl(quotes_list, port)
+        table = create_portfolio_table(p_data, palette=args.palette)
+        console.print(table)
+        return
+
+    # 4. Alerts operations
+    if args.alert:
+        sym = args.alert[0]
+        high_val, low_val, pct_val = None, None, None
+        for item in args.alert[1:]:
+            if item.startswith("high=") or item.startswith(">"):
+                high_val = float(item.split("=")[-1].replace(">", ""))
+            elif item.startswith("low=") or item.startswith("<"):
+                low_val = float(item.split("=")[-1].replace("<", ""))
+            elif item.startswith("pct=") or item.startswith("%"):
+                pct_val = float(item.split("=")[-1].replace("%", ""))
+            elif item.replace(".", "", 1).isdigit():
+                high_val = float(item)
+        save_alert(sym, target_high=high_val, target_low=low_val, max_change_pct=pct_val)
+        console.print(f"[bold green]✓ Alert saved for {sym.upper()}:[/] High={high_val}, Low={low_val}, Volatility={pct_val}%")
+        return
+
+    if args.alerts:
+        all_alerts = load_alerts()
+        if not all_alerts:
+            console.print("[dim]No price alerts configured.[/]")
+        else:
+            console.print("[bold gold1]🔔 Configured Price & Volatility Alerts:[/]")
+            for sym, cfg in all_alerts.items():
+                h = cfg.get('target_high', '-')
+                l = cfg.get('target_low', '-')
+                p = cfg.get('max_change_pct', '-')
+                console.print(f"  • [bold cyan]{sym}[/]: High ≥ {h} | Low ≤ {l} | ±Change ≥ {p}%")
+        return
+
+    if args.remove_alert:
+        if remove_alert(args.remove_alert):
+            console.print(f"[bold green]✓ Alert removed for {args.remove_alert.upper()}.[/]")
+        else:
+            console.print(f"[yellow]! No alert found for {args.remove_alert.upper()}.[/]")
+        return
+
+    # 5. Notes operations
     if args.note:
         sym, text = args.note
         save_note(sym, text, tags=["cli"])
@@ -161,7 +302,7 @@ def main():
                     console.print(f"  • [{e.get('timestamp')}] {e.get('text')}")
         return
 
-    # 3. Stock Detail View
+    # 6. Stock Detail View
     if args.detail:
         tracker = StockDataTracker(args.detail)
         if not args.sim:
@@ -172,7 +313,7 @@ def main():
         console.print(layout)
         return
 
-    # 4. Boss Mode Standalone
+    # 7. Boss Mode Standalone
     if args.boss:
         view = render_boss_view(args.boss_profile)
         console.print(view)
@@ -182,21 +323,40 @@ def main():
     symbols_list = args.symbols.split(",") if args.symbols else load_watchlist()
     trackers = [StockDataTracker(s) for s in symbols_list]
 
-    # 5. Print Snapshot Mode
+    # Fetch quotes if live mode
+    is_live = False
+    if not args.sim:
+        quotes = fetch_live_quotes(symbols_list, timeout=2.0)
+        if quotes:
+            is_live = True
+            for tr in trackers:
+                if tr.symbol in quotes:
+                    tr.update_from_quote(quotes[tr.symbol])
+
+    # 8. Export Daily Review Report
+    if args.export_daily:
+        notes = load_notes()
+        portfolio = load_portfolio()
+        report = export_daily_review(trackers, notes, portfolio, output_path=args.export_daily)
+        console.print(f"[bold green]✓ Daily Review report exported to {args.export_daily}[/]")
+        return
+
+    # 9. Print Snapshot Mode
     if args.print:
-        is_live = False
-        if not args.sim:
-            quotes = fetch_live_quotes(symbols_list, timeout=2.0)
-            if quotes:
-                is_live = True
-                for tr in trackers:
-                    if tr.symbol in quotes:
-                        tr.update_from_quote(quotes[tr.symbol])
-        table = create_stock_table(trackers, palette=args.palette, is_live=is_live)
+        # Check alerts
+        triggered = evaluate_alerts([tr.to_dict() for tr in trackers], trigger_notification=False)
+        table = create_stock_table(
+            trackers,
+            palette=args.palette,
+            is_live=is_live,
+            sort_by=args.sort,
+            reverse=(not args.asc),
+            alerts_triggered=triggered,
+        )
         console.print(table)
         return
 
-    # 6. Live Watch Loop Mode (Rich Live)
+    # 10. Live Watch Loop Mode (Rich Live)
     if args.watch:
         try:
             with Live(console=console, screen=True, refresh_per_second=int(1 / max(0.1, args.interval))) as live:
@@ -218,14 +378,22 @@ def main():
                         for tr in trackers:
                             tr.tick_simulation()
 
-                    tbl = create_stock_table(trackers, palette=args.palette, is_live=is_live)
+                    triggered = evaluate_alerts([tr.to_dict() for tr in trackers], trigger_notification=True)
+                    tbl = create_stock_table(
+                        trackers,
+                        palette=args.palette,
+                        is_live=is_live,
+                        sort_by=args.sort,
+                        reverse=(not args.asc),
+                        alerts_triggered=triggered,
+                    )
                     live.update(tbl)
                     time.sleep(args.interval)
         except KeyboardInterrupt:
             pass
         return
 
-    # 7. Default Interactive TUI Mode (Textual)
+    # 11. Default Interactive TUI Mode (Textual)
     app = StockTerminalApp(
         symbols=symbols_list,
         palette=args.palette,
@@ -233,6 +401,7 @@ def main():
         refresh_interval=args.interval,
     )
     app.run()
+
 
 
 if __name__ == "__main__":

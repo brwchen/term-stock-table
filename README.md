@@ -1,6 +1,6 @@
 # term-stock-table 📊
 
-> Professional terminal financial workstation: real-time stock watchlist, Bollinger Bands & quant indicators, stock detail views, persistent trade notes, and stealth Boss Mode.
+> Professional terminal financial workstation: real-time stock watchlist, portfolio & PnL valuation, Bollinger Bands / MACD / KDJ quant indicators, candlestick charts, 5-level order book depth, capital flow analysis, smart price alerts, persistent trade notes, and instant stealth Boss Mode.
 
 Built on top of [`term-sparkline`](https://github.com/brwchen/term-sparkline) for high-density inline vector sparklines and tick badges.
 
@@ -16,18 +16,29 @@ Built on top of [`term-sparkline`](https://github.com/brwchen/term-sparkline) fo
   - Live quote integration via high-speed API (A-Shares, HK, US stocks) with seamless offline simulation fallback.
   - Multi-market unified tickers: `600519` (Moutai), `000001` (Ping An), `300750` (CATL), `00700` (Tencent), `AAPL`, `NVDA`.
   - Comprehensive metrics: `Price`, `Change%`, `Change`, `Amplitude%`, `Turnover%`, `Volume`, `Turnover Amount`, `P/E`, `P/B`.
+- **Portfolio & Asset Valuation Tracker (持仓与盈亏看板)**:
+  - Track stock positions, cost basis, and shares directly from terminal (`stk --position 600519 100 1350.0`).
+  - Real-time floating PnL (¥/$), percentage returns, and today's PnL asset summary.
+  - Press <kbd>P</kbd> in TUI mode to toggle between Watchlist and Portfolio Holding views.
 - **Bollinger Bands & Quant Indicators**:
   - Compact Bollinger Bands %b position badge: `[··●··]` (Mid), `[····▶]` (Overbought), `[◀····]` (Oversold).
-  - Built-in Moving Averages (MA5, MA10, MA20), RSI(14), and Price-Volume dual-axis curves.
-  - Inline high-definition Sparkline curves with end-point dots and price change badges.
-- **Stock Detail View & 5-Level Order Book (五档盘口)**:
-  - Deep-dive view with intraday tick curves, technical analysis, and real-time Bid/Ask five-tier order depth.
+  - Built-in Moving Averages (MA5, MA10, MA20), RSI(14), MACD (12,26,9), and KDJ (9,3,3) oscillators.
+  - Valuation percentile meter (PE/PB historical valuation ranking).
+- **Stock Detail View, Candlesticks & 5-Level Order Book (五档盘口)**:
+  - Deep-dive view with intraday tick curves, multi-period ASCII/Unicode candlestick charts (press <kbd>k</kbd> to toggle).
+  - Real-time Bid/Ask five-tier order depth and Capital Flow (主力/超大单/散户净流入) breakdown.
+- **Smart Price & Volatility Alerts (智能价格预警与通知)**:
+  - Configure target high, stop low, and volatility threshold alerts (`stk --alert 600519 high=1800 low=1200 pct=3.0`).
+  - Automatic non-blocking macOS Notification Center alerts and visual table badges (`🚨`).
 - **Persistent Investment Journal & Strategy Notes**:
   - Record target prices, stop-loss levels, and trade rationales directly from terminal (stored locally in `~/.term_stock/notes.json`).
 - **Stealth Boss Mode (摸鱼神器 / Boss Key)**:
-  - Press `b` or `ESC` to instantly camouflage into real-time system monitoring or backend logs:
+  - Press <kbd>b</kbd> or <kbd>ESC</kbd> to instantly camouflage into real-time system monitoring or developer logs:
     - **DevOps Profile**: Linux `top` / `htop` dynamic process table.
     - **Kubernetes Profile**: `kubectl get pods -A` cluster status.
+    - **C++ Build Profile**: CMake / Ninja compilation stream (`[ 82%] Building CXX object...`).
+    - **Git Diff Profile**: Code review and diff viewer.
+    - **PyTorch ML Profile**: Deep learning training epoch loss loop.
     - **Nginx Profile**: `tail -f /var/log/nginx/access.log` HTTP stream.
     - **Monochrome Profile**: Grayscale neutral sensor telemetry table without market colors.
 - **Dual Runtime Architecture**:
@@ -58,17 +69,40 @@ stk
 stk --symbols 600519,000001,300750,AAPL,NVDA,00700
 ```
 
-### 2. Print Snapshot Table (CLI Mode)
+### 2. Portfolio Asset Valuation Mode
 
 ```bash
-# Fast print to terminal (ideal for tmux / i3 status)
-stk --print
+# Set position: 100 shares of 600519 at cost price ¥1350.0
+stk --position 600519 100 1350.0
 
-# US Market Green-Up/Red-Down Palette
-stk --print --palette us
+# View real-time portfolio holdings & PnL
+stk --portfolio
 ```
 
-### 3. Quick Detail View & Investment Notes
+### 3. Smart Price Alerts & Desktop Notifications
+
+```bash
+# Configure alert for price targets or 3% volatility
+stk --alert 600519 high=1800 low=1200 pct=3.0
+
+# List active alerts
+stk --alerts
+```
+
+### 4. Print Snapshot Table & Sorting (CLI Mode)
+
+```bash
+# Sort by price change percentage descending
+stk --print --sort change_pct
+
+# Display global major indices banner
+stk --indices
+
+# Export comprehensive daily review report
+stk --export-daily daily_review.md
+```
+
+### 5. Quick Detail View & Investment Notes
 
 ```bash
 # Open single stock detail view
@@ -81,11 +115,11 @@ stk --note 600519 "Target price 1800, stop loss 1250, wait for Q3 earnings"
 stk --notes
 ```
 
-### 4. Direct Boss Mode Launch
+### 6. Direct Boss Mode Launch
 
 ```bash
 # Start directly in stealth camouflage mode
-stk --boss --boss-profile kubectl
+stk --boss --boss-profile cpp
 ```
 
 ---
@@ -94,10 +128,15 @@ stk --boss --boss-profile kubectl
 
 | Key | Action | Description |
 |:---:|:---|:---|
-| <kbd>b</kbd> / <kbd>ESC</kbd> | **Boss Key (摸鱼模式)** | Instantly toggles camouflage profile (top, kubectl, nginx, mono) |
-| <kbd>Tab</kbd> | **Next Boss Profile** | Cycles camouflage disguise (DevOps → Kubernetes → Nginx → Monochrome) |
-| <kbd>Enter</kbd> | **Stock Detail View** | Opens deep detail page (OHLC, Indicators, 5-Level Order Book, Notes) |
-| <kbd>n</kbd> | **Add Note** | Opens note editor modal for the current stock |
+| <kbd>b</kbd> / <kbd>ESC</kbd> | **Boss Key (摸鱼模式)** | Instantly toggles camouflage profile |
+| <kbd>Tab</kbd> | **Next Boss Profile** | Cycles camouflage disguise (DevOps → K8s → C++ → Git → PyTorch → Nginx → Mono) |
+| <kbd>Enter</kbd> | **Stock Detail View** | Opens deep detail page (OHLC, Indicators, 5-Level Depth, Capital Flow, Notes) |
+| <kbd>k</kbd> | **Toggle K-Line** | In detail view, toggle between Multi-period Candlestick & Sparklines |
+| <kbd>P</kbd> | **Portfolio View** | Toggle between Watchlist Mode and Portfolio Asset Holdings Mode |
+| <kbd>s</kbd> | **Sort Column** | Cycle sort column (`change_pct`, `price`, `volume`, `amount`, `pe`) |
+| <kbd>r</kbd> | **Reverse Order** | Toggle between Descending (▼) and Ascending (▲) sorting |
+| <kbd>l</kbd> | **Set Price Alert** | Opens dialog to configure price targets and volatility alerts |
+| <kbd>n</kbd> | **Add Note** | Opens note editor modal for the highlighted stock |
 | <kbd>a</kbd> / <kbd>/</kbd> | **Add Stock** | Search and add stock symbol to persistent watchlist |
 | <kbd>d</kbd> | **Delete Stock** | Remove highlighted stock from watchlist |
 | <kbd>p</kbd> | **Toggle Palette** | Switch between CN (Red ▲) and US (Green ▲) palettes |
@@ -115,7 +154,15 @@ stk --boss --boss-profile kubectl
 
 ---
 
-### 2. Bollinger Bands Position Matrix (%b)
+### 2. Portfolio Holdings & Real-Time PnL Valuation
+> Real-time position tracking, cost basis accounting, floating profit/loss (¥/$), return rates, and today's PnL asset summary.
+<p align="center">
+  <img src="assets/features/portfolio_pnl_tracker.gif" alt="Portfolio PnL Tracker" width="680"/>
+</p>
+
+---
+
+### 3. Bollinger Bands & Quant Indicators Matrix
 > Intuitive `%b` position badges mapping whether prices are riding the upper band, oscillating in the middle, or oversold below the lower band.
 <p align="center">
   <img src="assets/features/bollinger_and_indicators.gif" alt="Bollinger Bands Indicators" width="680"/>
@@ -123,34 +170,18 @@ stk --boss --boss-profile kubectl
 
 ---
 
-### 3. Stock Detail View & 5-Level Order Book
-> Multi-panel stock analysis workstation with intraday Price+Volume combo curves, MA/RSI indicators, and real-time Bid/Ask depth.
+### 4. Stock Detail View, Candlesticks & 5-Level Order Book
+> Multi-panel stock analysis workstation with intraday Price+Volume combo curves, ASCII Candlesticks, MA/MACD/KDJ/RSI indicators, Capital Flow, and Bid/Ask depth.
 <p align="center">
   <img src="assets/features/stock_detail_view.gif" alt="Stock Detail View" width="680"/>
 </p>
 
 ---
 
-### 4. Persistent Investment Notes & Trade Journal
-> Built-in trade notebook for tracking catalysts, entry/exit criteria, and thesis validation without leaving the terminal.
-<p align="center">
-  <img src="assets/features/investment_notes.gif" alt="Investment Notes" width="680"/>
-</p>
-
----
-
 ### 5. Stealth Boss Mode (One-Key Camouflage)
-> Millisecond-level one-key disguise into Linux `top`, `kubectl get pods`, or `nginx access.log` streams.
+> Millisecond-level one-key disguise into Linux `top`, `kubectl get pods`, C++ compilation (`ninja`), Git diffs, PyTorch training loops, or `nginx` logs.
 <p align="center">
   <img src="assets/features/boss_mode_stealth.gif" alt="Boss Mode Stealth" width="680"/>
-</p>
-
----
-
-### 6. Watchlist Search & CLI Management
-> Fast CLI commands for managing persistent stock watchlists (`stk --add`, `stk --remove`, `stk --list`).
-<p align="center">
-  <img src="assets/features/watchlist_management.gif" alt="Watchlist Management" width="680"/>
 </p>
 
 ---
@@ -160,12 +191,15 @@ stk --boss --boss-profile kubectl
 | Module / Component | File | Description |
 |:---|:---|:---|
 | `api.py` | Core Data | Real-time quote fetcher (Tencent API) & offline Geometric Random Walk simulator |
-| `indicators.py` | Analytics | Bollinger Bands (%b, bandwidth), SMA (5/10/20), RSI(14), and badge renderers |
-| `config.py` | Storage | Persistent Watchlist, Notes, and Settings in `~/.term_stock/` |
-| `table.py` | UI Engine | Professional Rich Table generator with customizable columns & sparklines |
-| `detail.py` | Detail View | Multi-panel stock detail layout (Combo chart, 5-level order book, Notes panel) |
-| `boss.py` | Privacy | Boss mode camouflage engines (`devops`, `kubectl`, `nginx`, `monochrome`) |
-| `tui.py` | Interactive | Textual reactive application with modals, timers, and keybindings |
+| `portfolio.py` | Asset Engine | Position cost accounting, floating PnL, today PnL, and asset valuation tables |
+| `alerts.py` | Smart Alerts | Price target detection, threshold evaluation, and macOS desktop notifications |
+| `indicators.py` | Quant Analytics | Bollinger Bands, SMA, RSI, MACD, KDJ, Candlesticks, and valuation percentiles |
+| `market.py` | Macro & Flow | Major indices banner and multi-tier capital flow simulation |
+| `config.py` | Storage | Persistent Watchlist, Portfolio, Alerts, Notes, and Settings in `~/.term_stock/` |
+| `table.py` | UI Engine | Professional Rich Table generator with customizable columns, sorting & sparklines |
+| `detail.py` | Detail View | Multi-panel stock detail layout (Combo chart, 5-level order book, Capital flow, Notes) |
+| `boss.py` | Privacy | Boss mode camouflage engines (`devops`, `kubectl`, `cpp`, `git`, `python`, `nginx`) |
+| `tui.py` | Interactive | Textual reactive application with modals, timers, sorting, and keybindings |
 | `cli.py` | CLI Interface | Dual-mode CLI entrypoint (`stk` / `stock-table`) |
 
 ---
@@ -173,4 +207,5 @@ stk --boss --boss-profile kubectl
 ## 📄 License
 
 MIT © [brwchen](https://github.com/brwchen)
+
 

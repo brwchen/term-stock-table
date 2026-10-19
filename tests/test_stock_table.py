@@ -46,7 +46,152 @@ from term_stock_table.boss import (
     render_monochrome_table,
     PROFILES,
 )
+from term_stock_table.portfolio import calculate_portfolio_pnl, create_portfolio_table
+from term_stock_table.alerts import evaluate_alerts, send_desktop_notification
+from term_stock_table.indicators import (
+    compute_macd,
+    compute_kdj,
+    render_candlestick_chart,
+    estimate_valuation_percentile,
+)
+from term_stock_table.market import (
+    render_indices_banner,
+    simulate_capital_flow,
+    render_capital_flow_panel,
+)
+from term_stock_table.boss import (
+    render_boss_view,
+    render_devops_top,
+    render_kubectl_pods,
+    render_nginx_logs,
+    render_cpp_build,
+    render_git_diff,
+    render_python_train,
+    render_monochrome_table,
+    export_daily_review,
+    PROFILES,
+)
+from term_stock_table.config import (
+    load_portfolio,
+    save_position,
+    remove_position,
+    load_alerts,
+    save_alert,
+    remove_alert,
+)
 from term_stock_table.cli import main as cli_main
+
+
+def test_portfolio_and_pnl():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        test_dir = Path(tmpdir)
+        with patch("term_stock_table.config.DEFAULT_CONFIG_DIR", test_dir), \
+             patch("term_stock_table.config.PORTFOLIO_FILE", test_dir / "portfolio.json"):
+            
+            assert load_portfolio() == {}
+            save_position("600519", 100, 1300.0)
+            port = load_portfolio()
+            assert "600519" in port
+            assert port["600519"]["shares"] == 100
+            assert port["600519"]["cost"] == 1300.0
+
+            quotes = [{"symbol": "600519", "name": "贵州茅台", "price": 1350.0, "change": 10.0, "change_pct": 0.75}]
+            pnl_data = calculate_portfolio_pnl(quotes, port)
+            assert pnl_data["total_market_val"] == 135000.0
+            assert pnl_data["total_cost"] == 130000.0
+            assert pnl_data["total_float_pnl"] == 5000.0
+            assert pnl_data["total_today_pnl"] == 1000.0
+
+            tbl = create_portfolio_table(pnl_data, palette="cn")
+            assert isinstance(tbl, Table)
+
+            assert remove_position("600519") is True
+            assert remove_position("600519") is False
+
+
+def test_alerts_and_desktop_notifications():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        test_dir = Path(tmpdir)
+        with patch("term_stock_table.config.DEFAULT_CONFIG_DIR", test_dir), \
+             patch("term_stock_table.config.ALERTS_FILE", test_dir / "alerts.json"):
+
+            assert load_alerts() == {}
+            save_alert("600519", target_high=1400.0, target_low=1200.0, max_change_pct=2.0)
+            alerts = load_alerts()
+            assert "600519" in alerts
+
+            quotes = [{"symbol": "600519", "name": "贵州茅台", "price": 1450.0, "change_pct": 2.5}]
+            with patch("term_stock_table.alerts.send_desktop_notification") as mock_notif:
+                triggered = evaluate_alerts(quotes, alerts, trigger_notification=True)
+                assert "600519" in triggered
+                assert len(triggered["600519"]) == 2  # high target + max change
+                assert mock_notif.called
+
+            assert remove_alert("600519") is True
+            assert remove_alert("600519") is False
+
+            # Test notification safe run
+            send_desktop_notification("Test", "Safe message")
+
+
+def test_advanced_indicators_macd_kdj_candle():
+    prices = [10.0 + (i % 5) for i in range(30)]
+    dif, dea, hist = compute_macd(prices)
+    assert len(dif) == len(prices)
+    assert len(dea) == len(prices)
+    assert len(hist) == len(prices)
+
+    k, d, j = compute_kdj(prices)
+    assert len(k) == len(prices)
+    assert len(d) == len(prices)
+    assert len(j) == len(prices)
+
+    candles = [
+        {"open": 10.0, "high": 12.0, "low": 9.5, "close": 11.5},
+        {"open": 11.5, "high": 13.0, "low": 11.0, "close": 12.8},
+        {"open": 12.8, "high": 13.0, "low": 10.0, "close": 10.2},
+    ]
+    chart = render_candlestick_chart(candles, height=5, palette="cn")
+    assert "│" in chart
+    assert "█" in chart or "░" in chart
+
+    pct, status, badge = estimate_valuation_percentile(18.5)
+    assert 0 <= pct <= 100
+    assert "Reasonable" in status or "Fair" in status
+    assert "●" in badge
+
+
+def test_market_indices_and_capital_flow():
+    banner = render_indices_banner(palette="cn")
+    assert banner is not None
+
+    flow = simulate_capital_flow("600519", 1350.0, 50000)
+    assert "super_large" in flow
+    assert "main_net" in flow
+    panel = render_capital_flow_panel(flow, palette="cn")
+    assert panel is not None
+
+
+def test_boss_modes_and_daily_export():
+    assert render_cpp_build() is not None
+    assert render_git_diff() is not None
+    assert render_python_train() is not None
+
+    trackers = [StockDataTracker("600519"), StockDataTracker("AAPL")]
+    notes = {"600519": [{"timestamp": "2026-10-19 12:00:00", "text": "Hold for long term"}]}
+    portfolio = {"600519": {"shares": 100, "cost": 1300.0}}
+    
+    with tempfile.NamedTemporaryFile(suffix=".md", delete=False) as f:
+        tmp_path = f.name
+    try:
+        report = export_daily_review(trackers, notes, portfolio, output_path=tmp_path)
+        assert "Daily Financial Review" in report
+        assert "600519" in report
+        assert "Hold for long term" in report
+    finally:
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)
+
 
 
 def test_normalize_symbol_code():
@@ -288,8 +433,46 @@ def test_cli_commands():
                 with patch("sys.stdout", new_callable=io.StringIO):
                     cli_main()
 
-            # CLI --print snapshot
-            with patch.object(sys, "argv", ["stk", "--print", "--sim"]):
+            # CLI --indices
+            with patch.object(sys, "argv", ["stk", "--indices"]):
+                with patch("sys.stdout", new_callable=io.StringIO):
+                    cli_main()
+
+            # CLI --position and --portfolio
+            with patch.object(sys, "argv", ["stk", "--position", "600519", "100", "1350.0"]):
+                with patch("sys.stdout", new_callable=io.StringIO):
+                    cli_main()
+
+            with patch.object(sys, "argv", ["stk", "--portfolio", "--sim"]):
+                with patch("sys.stdout", new_callable=io.StringIO) as mock_out:
+                    cli_main()
+                    assert "PORTFOLIO" in mock_out.getvalue()
+
+            with patch.object(sys, "argv", ["stk", "--remove-position", "600519"]):
+                with patch("sys.stdout", new_callable=io.StringIO):
+                    cli_main()
+
+            # CLI --alert and --alerts
+            with patch.object(sys, "argv", ["stk", "--alert", "600519", "high=1800", "low=1200", "pct=3.0"]):
+                with patch("sys.stdout", new_callable=io.StringIO):
+                    cli_main()
+
+            with patch.object(sys, "argv", ["stk", "--alerts"]):
+                with patch("sys.stdout", new_callable=io.StringIO) as mock_out:
+                    cli_main()
+                    assert "600519" in mock_out.getvalue()
+
+            with patch.object(sys, "argv", ["stk", "--remove-alert", "600519"]):
+                with patch("sys.stdout", new_callable=io.StringIO):
+                    cli_main()
+
+            # CLI --export-daily
+            with patch.object(sys, "argv", ["stk", "--export-daily", "test_report.md", "--sim"]):
+                with patch("sys.stdout", new_callable=io.StringIO):
+                    cli_main()
+
+            # CLI --print snapshot with sorting
+            with patch.object(sys, "argv", ["stk", "--print", "--sim", "--sort", "change_pct", "--asc"]):
                 with patch("sys.stdout", new_callable=io.StringIO):
                     cli_main()
 

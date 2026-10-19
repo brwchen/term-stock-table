@@ -34,10 +34,29 @@ def create_stock_table(
     visible_columns: Optional[List[str]] = None,
     monochrome: bool = False,
     is_live: bool = True,
+    sort_by: Optional[str] = None,
+    reverse: bool = True,
+    alerts_triggered: Optional[Dict[str, List[str]]] = None,
 ) -> Table:
-    """Create a high-density, professional Rich Table for stock monitoring."""
+    """Create a high-density, professional Rich Table for stock monitoring with sorting & alert indicators."""
     is_cn = (palette == "cn")
     
+    # Sort trackers if requested
+    sorted_trackers = list(trackers)
+    if sort_by:
+        key_map = {
+            "change_pct": lambda t: t.change_pct,
+            "price": lambda t: t.price,
+            "volume": lambda t: t.volume,
+            "amount": lambda t: t.amount,
+            "amplitude": lambda t: t.amplitude,
+            "turnover_rate": lambda t: t.turnover_rate,
+            "symbol": lambda t: t.symbol,
+            "pe": lambda t: (t.pe or 0.0),
+        }
+        if sort_by in key_map:
+            sorted_trackers.sort(key=key_map[sort_by], reverse=reverse)
+
     table = Table(
         box=ROUNDED,
         show_header=True,
@@ -69,24 +88,27 @@ def create_stock_table(
     for col_key in cols_to_show:
         if col_key in all_col_defs:
             title, justify, style, min_w = all_col_defs[col_key]
+            # Add sort indicator arrow
+            if sort_by == col_key:
+                title += " ▼" if reverse else " ▲"
             table.add_column(title, justify=justify, style=style, min_width=min_w)
 
     up_count = 0
     down_count = 0
     flat_count = 0
 
-    for tr in trackers:
+    for tr in sorted_trackers:
         chg = tr.change
         chg_pct = tr.change_pct
 
         if chg > 0.0001:
             up_count += 1
             color_style = "grey70" if monochrome else ("bright_red" if is_cn else "bright_green")
-            ansi_arrow = "▲" if is_cn else "▲"
+            ansi_arrow = "▲"
         elif chg < -0.0001:
             down_count += 1
             color_style = "grey70" if monochrome else ("bright_green" if is_cn else "bright_red")
-            ansi_arrow = "▼" if is_cn else "▼"
+            ansi_arrow = "▼"
         else:
             flat_count += 1
             color_style = "grey70" if monochrome else "bright_white"
@@ -108,10 +130,14 @@ def create_stock_table(
             annotate=(not monochrome),
         )
 
+        sym_display = tr.symbol
+        if alerts_triggered and tr.symbol in alerts_triggered:
+            sym_display = f"🚨 {tr.symbol}"
+
         row_cells = []
         for col_key in cols_to_show:
             if col_key == "symbol":
-                row_cells.append(tr.symbol)
+                row_cells.append(sym_display)
             elif col_key == "name":
                 row_cells.append(tr.name)
             elif col_key == "price":
@@ -138,11 +164,12 @@ def create_stock_table(
         table.add_row(*row_cells)
 
     # Market Sentiment in Caption
-    total = len(trackers)
+    total = len(sorted_trackers)
     sentiment_str = f"Market: [bold green]▲ {up_count}[/] Up | [bold red]▼ {down_count}[/] Down | [bold white]- {flat_count}[/] Flat (Total: {total})" if not is_cn else f"市场情绪: [bold red]▲ {up_count} 涨[/] | [bold green]▼ {down_count} 跌[/] | [bold white]- {flat_count} 平[/] (自选: {total} 只)"
     source_tag = "[bold green][● LIVE QUOTE (Tencent API)][/]" if is_live else "[bold yellow][○ SIMULATION ENGINE][/]"
     
-    table.title = f"⚡ TERM-STOCK-TABLE FINANCIAL TERMINAL ⚡  {source_tag}"
-    table.caption = f"{sentiment_str} | Press [bold cyan]Enter[/] for Detail & Notes | [bold magenta]b[/] for Boss Mode | [bold yellow]q[/] to Quit"
+    sort_info = f" | Sort: [bold cyan]{sort_by or 'default'}[/] ({'DESC' if reverse else 'ASC'})" if sort_by else ""
+    table.title = f"⚡ TERM-STOCK-TABLE FINANCIAL TERMINAL ⚡  {source_tag}{sort_info}"
+    table.caption = f"{sentiment_str} | [bold cyan]s[/] Sort | [bold green]P[/] Portfolio | [bold magenta]b[/] Boss Key | [bold yellow]q[/] Quit"
 
     return table
