@@ -4,7 +4,7 @@ import time
 from typing import Any, Dict, List, Optional
 
 from rich.align import Align
-from rich.box import ROUNDED
+from rich.box import ROUNDED, SIMPLE_HEAD
 from rich.console import Group
 from rich.panel import Panel
 from rich.table import Table
@@ -68,35 +68,34 @@ def level_for(change_pct: float) -> tuple:
     return "INFO ", "green"
 
 
-def render_log_view(trackers: List[StockDataTracker], selected_symbol: Optional[str] = None) -> Group:
-    now = time.time()
-    lines = []
+def render_log_view(trackers: List[StockDataTracker], selected_symbol: Optional[str] = None) -> Table:
+    """Service-status table: alias, price, change, position and live trend per holding."""
+    from .config import load_portfolio
+
+    portfolio = load_portfolio()
+    table = Table(box=SIMPLE_HEAD, expand=False, header_style="bold grey70", pad_edge=False)
+    table.add_column("SERVICE", style="cyan", no_wrap=True)
+    table.add_column("VALUE", justify="right", no_wrap=True)
+    table.add_column("DELTA", justify="right", no_wrap=True)
+    table.add_column("REPLICAS", justify="right", no_wrap=True)
+    table.add_column("TREND", no_wrap=True)
     for tr in trackers:
         prices = list(tr.prices)
-        prev = tr.prev_close or (prices[0] if prices else 1.0)
-        svc = service_name(tr.symbol, tr.name)
-        for k in (2, 1, 0):
-            if len(prices) <= k:
-                continue
-            price = prices[-1 - k]
-            ref = prices[-2 - k] if len(prices) > 1 + k else prev
-            pct = (price - prev) / prev * 100 if prev else 0.0
-            ts = now - k * 1.0
-            lines.append((ts, tr.symbol, svc, to_ms(price, prev), (price - ref) / ref * 100 if ref else 0.0, pct, k))
-    lines.sort(key=lambda row: (row[0], row[2]))
-    out = []
-    for ts, symbol, svc, ms, step, pct, k in lines:
-        level, color = level_for(pct)
-        stamp = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(ts))
-        text = Text()
-        text.append(stamp + " ", style="grey62")
-        text.append(level + " ", style=f"bold {color}")
-        text.append(f"{svc:<8}", style="cyan")
-        text.append(f" latency={ms:6.1f}ms  drift={step:+.2f}%  slo={SLO_MS:.0f}ms  trace={trace_id(symbol, int(ts))}",
-                    style="bold white" if symbol == selected_symbol else "white")
-        out.append(text)
-    header = Text(f"tail -f /var/log/gateway/access.log  ({len(trackers)} upstreams)", style="bold grey70")
-    return Group(header, Text(""), *out)
+        if not prices:
+            continue
+        prev = tr.prev_close or prices[0]
+        pct = (prices[-1] - prev) / prev * 100 if prev else 0.0
+        shares = float((portfolio.get(tr.symbol) or {}).get("shares", 0) or 0)
+        style = "bold white" if tr.symbol == selected_symbol else "white"
+        tone = "orange3" if pct < 0 else "deep_sky_blue1"
+        table.add_row(
+            Text(service_name(tr.symbol, tr.name), style="bold cyan" if tr.symbol == selected_symbol else "cyan"),
+            Text(f"{prices[-1]:,.2f}", style=style),
+            Text(f"{pct:+.2f}%", style=tone),
+            Text(f"{shares:,.0f}" if shares else "-", style=style),
+            braille_curve(prices[-60:], width=24, rows=1, color=tone, baseline=prev),
+        )
+    return table
 
 
 def quantile(values: List[float], q: float) -> float:
