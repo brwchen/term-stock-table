@@ -25,7 +25,9 @@ from .market import simulate_capital_flow
 
 WIDE_LAYOUT_MIN = 72
 BOOK_WIDTH = 28
-CHART_ROWS = 10
+SIDE_HEIGHT = 20  # order book (13) + ticks (7) panels; the chart panel is stretched to match
+CHART_OVERHEAD = 6  # borders, info line, time axis, 2-line volume strip
+CHART_ROWS = SIDE_HEIGHT - CHART_OVERHEAD
 BAR_LEVELS = " ▁▂▃▄▅▆▇█"
 TIME_LABELS = [(0.0, "09:30"), (0.25, "10:30"), (0.5, "11:30"), (0.75, "14:00"), (1.0, "15:00")]
 
@@ -361,13 +363,17 @@ class DetailBody:
         tr = self.tracker
         k_mode = self.period != "intraday" and bool(self.candles)
         price_list = [c["close"] for c in self.candles] if k_mode else list(tr.prices)
-        main = CandleView(self.candles, self.period, self.palette) if k_mode else PriceChart(tr, self.palette)
-        main = Panel(main, title=period_label(self.period), box=ROUNDED, border_style="cyan", padding=(0, 1))
+        main = CandleView(self.candles, self.period, self.palette, height=SIDE_HEIGHT - 10) if k_mode else PriceChart(tr, self.palette)
+        wide = options.max_width >= WIDE_LAYOUT_MIN
+        main = Panel(
+            main, title=period_label(self.period), box=ROUNDED, border_style="cyan", padding=(0, 1),
+            height=SIDE_HEIGHT if wide else None,
+        )
 
         if self.period != "intraday" and self.period_note and not k_mode:
             yield Text(self.period_note, style="bold yellow")
         side = side_panel(tr, self.palette)
-        if options.max_width >= WIDE_LAYOUT_MIN:
+        if wide:
             grid = Table.grid(expand=True, padding=(0, 1, 0, 0))
             grid.add_column(ratio=1)
             grid.add_column(width=BOOK_WIDTH)

@@ -40,7 +40,8 @@ def candles_from_prices(prices: List[float], count: int = 30) -> List[Dict[str, 
 class CandleView:
     """Candlestick + volume block that sizes itself to the available width at render time."""
 
-    def __init__(self, candles: List[Dict[str, Any]], period: str, palette: str = "cn"):
+    def __init__(self, candles: List[Dict[str, Any]], period: str, palette: str = "cn", height: int = 10):
+        self.height = height
         self.candles = candles
         self.period = period
         self.palette = palette
@@ -50,7 +51,7 @@ class CandleView:
         shown = self.candles[-n:]
         last = shown[-1]
         yield Text(f"─── {t('d_kline')} [{period_label(self.period)}] {shown[0]['date']} → {last['date']} ───", style="bold gold1")
-        for line in render_candlestick_chart(shown, height=10, palette=self.palette, gap=1).split("\n"):
+        for line in render_candlestick_chart(shown, height=self.height, palette=self.palette, gap=1).split("\n"):
             yield Text.from_ansi(line)
         yield Text(
             f"O {last['open']:.2f}  H {last['high']:.2f}  L {last['low']:.2f}  C {last['close']:.2f}",
