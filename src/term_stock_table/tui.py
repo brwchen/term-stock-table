@@ -752,7 +752,7 @@ class StockTerminalApp(App):
             return ""
         blank = overlay_blank(OVERLAY_BLANK_WIDTH)
         out = ["\x1b7"]
-        idx = self.hidden_rows_above()
+        idx = 0 if (self.is_boss_mode or self.stealth) else self.hidden_rows_above()
         first = idx
         for y, strip in enumerate(strips):
             text = strip.text
@@ -829,12 +829,16 @@ class StockTerminalApp(App):
             return
 
         self.overlay_items = []
-        if self.is_boss_mode:
-            prof = PROFILES[self.boss_profile_idx % len(PROFILES)]
-            renderable = render_boss_view(prof, trackers=self.trackers)
+        if self.is_boss_mode or self.stealth:
+            queue = overlay_begin() if self.overlay_enabled else None
+            if self.is_boss_mode:
+                prof = PROFILES[self.boss_profile_idx % len(PROFILES)]
+                renderable = render_boss_view(prof, trackers=self.trackers)
+            else:
+                renderable = stealth_mod.render_log_view(self.trackers, self.selected_symbol)
+            overlay_end()
+            self.overlay_items = queue or []
             view_widget.update(renderable)
-        elif self.stealth:
-            view_widget.update(stealth_mod.render_log_view(self.trackers, self.selected_symbol))
             view_widget.styles.width = "100%"
         elif self.is_portfolio_mode:
             port = load_portfolio()

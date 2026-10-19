@@ -33,9 +33,9 @@ def render_devops_top(trackers=None, selected_symbol: Optional[str] = None) -> T
     table.add_column("S", justify="center", style="bold green", width=2)
     table.add_column("%CPU", justify="right", style="bold green", width=7)
     table.add_column("%MEM", justify="right", style="cyan", width=5)
-    table.add_column("TIME+", justify="right", style="dim", width=9)
+    table.add_column("TIME+", justify="right", style="dim", width=10)
     if trackers:
-        table.add_column("HIST", justify="left", width=16, no_wrap=True)
+        table.add_column("HIST", justify="left", width=20, no_wrap=True)
     table.add_column("COMMAND", justify="left", style="bold white", no_wrap=True, overflow="ellipsis", max_width=28)
 
     fake_procs = [
@@ -50,20 +50,27 @@ def render_devops_top(trackers=None, selected_symbol: Optional[str] = None) -> T
 
     rows = [(float(p[8]), p) for p in fake_procs]
     if trackers:
-        rows = [(cpu, p[:10] + (Text(""),) + p[10:]) for cpu, p in rows]
-        rows += [_stock_process_row(tr, selected_symbol) for tr in trackers if tr.prices]
+        rows = [(cpu, p[:11] + (Text(""),) + p[11:]) for cpu, p in rows]
+        rows += [(abs(_change_pct(tr)) * 3 + 0.1, tr) for tr in trackers if tr.prices]
     rows.sort(key=lambda r: -r[0])
+    # Stock rows are built in final order so queued trend images map to rows in sequence.
     for _, row in rows:
-        table.add_row(*row)
+        table.add_row(*(_stock_process_row(row, selected_symbol) if hasattr(row, "prices") else row))
 
     return table
+
+
+def _change_pct(tr) -> float:
+    prices = list(tr.prices)
+    prev = tr.prev_close or prices[0]
+    return (prices[-1] - prev) / prev * 100 if prev else 0.0
 
 
 def _stock_process_row(tr, selected_symbol):
     """One holding as a process row: price in RES, change in %CPU, position in VIRT."""
     import hashlib
     from .config import load_portfolio
-    from .inline_spark import braille_curve
+    from .inline_spark import smart_spark
     from .stealth import service_name
 
     prices = list(tr.prices)
@@ -78,10 +85,10 @@ def _stock_process_row(tr, selected_symbol):
         f"{shares:,.0f}" if shares else "-",
         f"{prices[-1]:,.2f}", "12M", "S",
         Text(f"{pct:+.2f}", style=tone), "0.4", "00:12.07",
-        braille_curve(prices[-60:], width=16, rows=1, color=tone, baseline=prev),
+        smart_spark(prices[-60:], length=20, up=pct >= 0),
         f"{service_name(tr.symbol, tr.name)}-worker",
     )
-    return abs(pct) * 3 + 0.1, tuple(Text(c, style=style) if isinstance(c, str) else c for c in row)
+    return tuple(Text(c, style=style) if isinstance(c, str) else c for c in row)
 
 
 def render_kubectl_pods() -> Table:
