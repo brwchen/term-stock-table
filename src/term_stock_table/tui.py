@@ -443,6 +443,10 @@ class StockTerminalApp(App):
     Screen {
         background: #0f1117;
     }
+    Footer {
+        overflow: hidden hidden;
+        scrollbar-size: 0 0;
+    }
     #main-scroll {
         width: 100%;
         height: 1fr;
