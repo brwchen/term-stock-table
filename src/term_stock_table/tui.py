@@ -486,7 +486,6 @@ class StockTerminalApp(App):
     }
     #detail-header {
         height: auto;
-        margin-bottom: 1;
     }
     #detail-periods {
         height: 1;
@@ -494,16 +493,17 @@ class StockTerminalApp(App):
         overflow: hidden hidden;
     }
     #detail-periods Button {
-        background: transparent;
-        color: $text-muted;
+        background: #1f2937;
+        color: #cbd5e1;
         text-style: none;
     }
     #detail-periods Button.active {
-        color: #ff5252;
-        text-style: bold underline;
+        background: #dc2626;
+        color: white;
+        text-style: bold;
     }
     #detail-periods Button:hover {
-        background: #1a202c;
+        background: #374151;
     }
     #detail-footer {
         height: 1;

@@ -169,7 +169,7 @@ def _kline_urls(code: str, period: str, count: int) -> List[Tuple[str, str]]:
     return out
 
 
-def fetch_kline(symbol: str, period: str = "day", count: int = 60, timeout: float = 4.0) -> List[Dict[str, Any]]:
+def fetch_kline(symbol: str, period: str = "day", count: int = 160, timeout: float = 4.0) -> List[Dict[str, Any]]:
     """Fetch OHLCV candles from Tencent for m5/m15/m30/m60/day/week/month; [] if unavailable."""
     if period not in KLINE_PERIODS:
         return []

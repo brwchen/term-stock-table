@@ -78,8 +78,9 @@ class DetailHeader:
         up, down = trend_styles(self.palette)
         style = up if tr.change >= 0 else down
         arrow = "▲" if tr.change >= 0 else "▼"
-        yield Align.center(Text(tr.name, style="bold bright_white"))
-        yield Align.center(Text(tr.symbol, style="dim"))
+        title = Text()
+        title.append(tr.name, style="bold bright_white")
+        title.append(f"  {tr.symbol}", style="dim")
 
         price = Text()
         price.append(f"{tr.price:.2f}\n", style=f"bold {style}")
@@ -110,7 +111,7 @@ class DetailHeader:
         outer.add_column(width=max(16, len(price.plain.split("\n")[1]) + 2))
         outer.add_column(justify="right", ratio=1)
         outer.add_row(price, grid)
-        yield outer
+        yield Panel(Group(Align.center(title), outer), box=ROUNDED, border_style="cyan", padding=(0, 1))
 
 
 class PriceChart:
@@ -239,10 +240,8 @@ def tick_table(tracker: StockDataTracker, palette: str, count: int = 5) -> Table
 
 def side_panel(tracker: StockDataTracker, palette: str):
     return Group(
-        Align.center(Text(t("d_book"), style="bold")),
-        order_book(tracker, palette),
-        Align.center(Text(t("d_ticks"), style="bold")),
-        tick_table(tracker, palette),
+        Panel(order_book(tracker, palette), title=t("d_book"), box=ROUNDED, border_style="cyan", padding=(0, 1)),
+        Panel(tick_table(tracker, palette), title=t("d_ticks"), box=ROUNDED, border_style="cyan", padding=(0, 1)),
     )
 
 
@@ -260,7 +259,6 @@ def indicator_text(price_list: List[float], tracker: StockDataTracker) -> Text:
     ma20 = compute_sma(price_list, 20)[-1] or tracker.price
     last_hist = hist[-1] if hist else 0.0
     text = Text()
-    text.append(f"─── {t('d_indicators')} ───\n", style="bold gold1")
     text.append(f"• MA    : MA5={ma5:.2f} | MA10={ma10:.2f} | MA20={ma20:.2f}\n", style="dim white")
     text.append(f"• BOLL  : Upper={upper:.2f} | Mid={mid:.2f} | Lower={lower:.2f} (%b={pct_b:.2f})\n", style="dim white")
     text.append(
@@ -316,6 +314,7 @@ class DetailBody:
         k_mode = self.period != "intraday" and bool(self.candles)
         price_list = [c["close"] for c in self.candles] if k_mode else list(tr.prices)
         main = CandleView(self.candles, self.period, self.palette) if k_mode else PriceChart(tr, self.palette)
+        main = Panel(main, title=period_label(self.period), box=ROUNDED, border_style="cyan", padding=(0, 1))
 
         if self.period != "intraday" and self.period_note and not k_mode:
             yield Text(self.period_note, style="bold yellow")
@@ -329,8 +328,7 @@ class DetailBody:
         else:
             yield main
             yield side
-        yield Text("")
-        yield indicator_text(price_list, tr)
+        yield Panel(indicator_text(price_list, tr), title=t("d_indicators"), box=ROUNDED, border_style="cyan", padding=(0, 1))
         yield flow_panel(tr, self.palette)
         yield notes_panel(tr, self.notes)
 
