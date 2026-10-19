@@ -353,7 +353,7 @@ class DetailModal(ScrollKeysMixin, ModalScreen[None]):
                 yield Static(id="detail-view")
             with Horizontal(id="detail-periods"):
                 for i, p in enumerate(self.PERIODS, 1):
-                    yield Button(f"{period_label(p)} ({i})", id=f"period-{p}", variant="default")
+                    yield Button(f"{period_label(p)} {i}", id=f"period-{p}", variant="default")
             with Horizontal(id="detail-footer"):
                 yield Button(t("add_note_btn"), id="detail-note-btn", variant="primary")
                 yield Button(t("close_enter"), id="detail-close-btn", variant="default")
@@ -471,7 +471,7 @@ class StockTerminalApp(App):
         height: 95%;
         background: #0f1117;
         border: solid $accent;
-        padding: 1;
+        padding: 0 1;
         align: center middle;
     }
     #detail-scroll {
@@ -484,12 +484,21 @@ class StockTerminalApp(App):
         height: auto;
     }
     #detail-periods {
-        height: 3;
+        height: 1;
         align: center middle;
+        overflow: hidden hidden;
     }
     #detail-footer {
-        height: 3;
+        height: 1;
         align: right middle;
+        overflow: hidden hidden;
+    }
+    #detail-periods Button, #detail-footer Button {
+        height: 1;
+        min-width: 0;
+        border: none;
+        padding: 0;
+        margin: 0 1 0 0;
     }
     #note-buttons, #add-buttons, #alert-buttons {
         margin-top: 1;
