@@ -163,6 +163,17 @@ class AddStockModal(ModalScreen[None]):
             self.dismiss()
 
 
+class BossScreen(Screen):
+    """Full-screen disguise pushed over any modal; b / Esc / Tab are handled by the app."""
+
+    def __init__(self, renderable):
+        super().__init__()
+        self.renderable = renderable
+
+    def compose(self) -> ComposeResult:
+        yield Static(self.renderable, id="boss-view")
+
+
 class ThinScrollBarRender(ScrollBarRender):
     """Hairline scrollbar: a one-eighth-cell thumb on a blank track."""
 
@@ -576,6 +587,7 @@ class StockTerminalApp(App):
 
     BINDINGS = [
         Binding("b", "toggle_boss", "Boss Key", priority=True),
+        Binding("ctrl+b", "toggle_boss(False)", "Boss Key", show=False, priority=True),
         Binding("escape", "handle_escape", "Escape", priority=True),
         Binding("tab", "cycle_boss_profile", "Next Boss Disguise"),
         Binding("enter", "show_detail", "Stock Detail"),
@@ -829,21 +841,38 @@ class StockTerminalApp(App):
             view_widget.update(tbl)
             self.fit_table_width(view_widget, tbl)
 
-    def action_toggle_boss(self) -> None:
-        """Instantly toggle Boss Mode disguise."""
-        self.is_boss_mode = not self.is_boss_mode
-        self.update_view()
+    def boss_renderable(self):
+        return render_boss_view(PROFILES[self.boss_profile_idx % len(PROFILES)], trackers=self.trackers)
+
+    def top_screen(self):
+        return self.screen_stack[-1] if self.screen_stack else None
+
+    def action_toggle_boss(self, from_key: bool = True) -> None:
+        """Instantly toggle Boss Mode disguise, on the main view and over every modal."""
+        if from_key and self.screen_stack and isinstance(self.focused, Input):
+            self.focused.insert_text_at_cursor("b")
+            return
+        if isinstance(self.top_screen(), BossScreen):
+            self.pop_screen()
+        elif len(self.screen_stack) > 1:
+            self.push_screen(BossScreen(self.boss_renderable()))
+        else:
+            self.is_boss_mode = not self.is_boss_mode
+            self.update_view()
 
     def action_handle_escape(self) -> None:
-        """Escape toggles boss mode or closes active modal."""
-        if self.screen_stack and len(self.screen_stack) > 1:
+        """Escape leaves the disguise, closes the active modal, or toggles boss mode."""
+        if len(self.screen_stack) > 1:
             self.pop_screen()
         else:
             self.action_toggle_boss()
 
     def action_cycle_boss_profile(self) -> None:
         """Cycle through Boss mode profiles."""
-        if self.is_boss_mode:
+        if isinstance(self.top_screen(), BossScreen):
+            self.boss_profile_idx = (self.boss_profile_idx + 1) % len(PROFILES)
+            self.screen.query_one("#boss-view", Static).update(self.boss_renderable())
+        elif self.is_boss_mode:
             self.boss_profile_idx = (self.boss_profile_idx + 1) % len(PROFILES)
             self.update_view()
 
