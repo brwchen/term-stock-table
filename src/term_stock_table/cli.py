@@ -34,6 +34,10 @@ from .backtest import StrategyBacktester
 from .statusline import StatuslineFormatter
 from .importer import PortfolioDataImporter
 from .webhook import WebhookDispatcher, WebhookConfig
+from .themes import ThemeManager, THEMES
+from .formula import FormulaManager, CustomFormula
+from .tmux import TmuxLayoutGenerator
+from .graphics import TerminalGraphicsRenderer
 from .tui import StockTerminalApp
 
 
@@ -58,6 +62,29 @@ def main():
         choices=["cn", "us"],
         default="cn",
         help="Market color palette ('cn': Red up/Green down, 'us': Green up/Red down)"
+    )
+    parser.add_argument(
+        "--theme", "-t",
+        choices=list(THEMES.keys()),
+        default="classic_cn",
+        help="Color theme preset ('bloomberg', 'tokyonight', 'catppuccin', 'cyberpunk', 'nord', 'gruvbox', 'classic_cn', 'classic_us')"
+    )
+    parser.add_argument(
+        "--formula",
+        type=str,
+        metavar="EXPR",
+        help="Evaluate custom quantitative formula (e.g. --formula 'TYPICAL_PRICE' or '(HIGH+LOW)/2')"
+    )
+    parser.add_argument(
+        "--tmux-layout",
+        action="store_true",
+        help="Preview or generate 4-pane Tmux trading room workstation script"
+    )
+    parser.add_argument(
+        "--pixel-chart",
+        type=str,
+        metavar="SYMBOL",
+        help="Render inline high-resolution candlestick chart using iTerm2 / Kitty graphics protocol"
     )
     parser.add_argument(
         "--print",
@@ -251,10 +278,37 @@ def main():
     args = parser.parse_args()
     console = Console()
 
-    # 1. Indices Banner & Radar & Sector
-    if args.indices:
-        banner = render_indices_banner(palette=args.palette)
-        console.print(banner)
+    # 1. Indices Banner & Radar & Sector & Tmux
+    if args.tmux_layout or (len(sys.argv) > 1 and sys.argv[1] == "tmux-launch"):
+        gen = TmuxLayoutGenerator(symbols=args.symbols.split(",") if args.symbols else None)
+        console.print(gen.render_preview_panel())
+        script = gen.generate_shell_script()
+        console.print(f"\n[bold green]Tmux Launch Script:\n[/][dim]{script}[/]")
+        return
+
+    if args.pixel_chart:
+        tr = StockDataTracker(args.pixel_chart)
+        candles = []
+        for i in range(15):
+            base = tr.prices[min(len(tr.prices)-1, i * 2)]
+            candles.append((base * 0.99, base * 1.02, base * 0.98, base * 1.01))
+        escape_seq = TerminalGraphicsRenderer.display_chart(candles, palette=args.palette)
+        if escape_seq:
+            sys.stdout.write(escape_seq)
+            sys.stdout.flush()
+        else:
+            console.print(f"[yellow]Terminal graphics protocol not supported in this session. Use Unicode view: stk --detail {args.pixel_chart}[/]")
+        return
+
+    if args.formula:
+        symbols_list = args.symbols.split(",") if args.symbols else load_watchlist()
+        formulas = FormulaManager.load_formulas()
+        form_obj = formulas.get(args.formula.upper()) or CustomFormula("CUSTOM", args.formula, "Custom Expression")
+        console.print(f"[bold cyan]📐 Custom Formula Evaluation:[/] [yellow]{form_obj.name}[/] = [bold white]{form_obj.expression}[/]\n")
+        for sym in symbols_list:
+            tr = StockDataTracker(sym)
+            val = FormulaManager.evaluate_tracker(form_obj, tr)
+            console.print(f"  • [bold white]{tr.name}[/] ({sym}): [bold green]{val:.2f}[/]")
         return
 
     if args.radar:

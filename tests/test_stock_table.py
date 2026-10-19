@@ -396,7 +396,8 @@ def test_cli_commands():
         test_dir = Path(tmpdir)
         with patch("term_stock_table.config.DEFAULT_CONFIG_DIR", test_dir), \
              patch("term_stock_table.config.WATCHLIST_FILE", test_dir / "watchlist.json"), \
-             patch("term_stock_table.config.NOTES_FILE", test_dir / "notes.json"):
+             patch("term_stock_table.config.NOTES_FILE", test_dir / "notes.json"), \
+             patch("term_stock_table.cli.StockTerminalApp"):
 
             # CLI --add and --list
             with patch.object(sys, "argv", ["stk", "--add", "TSLA"]):
@@ -477,10 +478,14 @@ def test_cli_commands():
                     cli_main()
 
             # CLI --watch mock
-            with patch.object(sys, "argv", ["stk", "--watch", "--sim", "--interval", "0.1"]):
-                with patch("time.sleep", side_effect=KeyboardInterrupt):
-                    with patch("sys.stdout", new_callable=io.StringIO):
-                        cli_main()
+            with patch("term_stock_table.cli.Live") as mock_live_cls:
+                mock_instance = MagicMock()
+                mock_live_cls.return_value.__enter__.return_value = mock_instance
+                with patch("term_stock_table.cli.time.sleep", side_effect=KeyboardInterrupt), \
+                     patch("time.sleep", side_effect=KeyboardInterrupt):
+                    with patch.object(sys, "argv", ["stk", "--watch", "--sim", "--interval", "0.1"]):
+                        with patch("sys.stdout", new_callable=io.StringIO):
+                            cli_main()
 
 
 def test_tui_app_actions():
@@ -696,5 +701,110 @@ def test_extended_cli_and_boss():
     with patch.object(sys, "argv", ["stk", "--webhook-test"]):
         with patch("sys.stdout", new_callable=io.StringIO):
             cli_main()
+
+
+def test_theme_manager():
+    from term_stock_table.themes import ThemeManager, THEMES
+
+    tm = ThemeManager("bloomberg")
+    assert tm.current_theme.name == "bloomberg"
+    assert tm.get_color(+1.5) == tm.current_theme.up_color
+    assert tm.get_color(-1.5) == tm.current_theme.down_color
+
+    for th in THEMES.keys():
+        tm.set_theme(th)
+        assert tm.current_theme.name == th
+
+    assert "tokyonight" in ThemeManager.list_themes()
+
+
+def test_formula_engine():
+    from term_stock_table.formula import FormulaManager, CustomFormula, SafeFormulaEvaluator
+
+    ctx = {"OPEN": 100.0, "HIGH": 110.0, "LOW": 95.0, "CLOSE": 105.0, "VOL": 5000, "PRE_CLOSE": 100.0}
+    evaluator = SafeFormulaEvaluator(ctx, price_history=[90.0, 95.0, 100.0, 105.0])
+
+    assert evaluator.evaluate("HIGH - LOW") == 15.0
+    assert evaluator.evaluate("(HIGH + LOW + CLOSE) / 3") == 103.33333333333333
+    assert evaluator.evaluate("MA(CLOSE, 3)") == 100.0
+    assert evaluator.evaluate("ABS(-10)") == 10.0
+
+    # Test formula manager
+    formulas = FormulaManager.load_formulas()
+    assert "TYPICAL_PRICE" in formulas
+    tr = StockDataTracker("600519")
+    val = FormulaManager.evaluate_tracker(formulas["TYPICAL_PRICE"], tr)
+    assert val > 0
+
+
+def test_tmux_layout_generator():
+    from term_stock_table.tmux import TmuxLayoutGenerator
+
+    gen = TmuxLayoutGenerator("test-session", symbols=["600519", "AAPL"])
+    script = gen.generate_shell_script()
+    assert "tmux" in script
+    assert "600519" in script
+    assert gen.render_preview_panel() is not None
+
+
+def test_terminal_graphics():
+    from term_stock_table.graphics import TerminalGraphicsRenderer, detect_graphics_protocol
+
+    candles = [(100.0, 105.0, 98.0, 103.0), (103.0, 108.0, 101.0, 107.0)]
+    img = TerminalGraphicsRenderer.render_pixel_candlestick_chart(candles)
+    assert img.size == (580, 240)
+
+    iterm_seq = TerminalGraphicsRenderer.image_to_iterm2_escape(img)
+    assert "\033]1337;File=inline=1" in iterm_seq
+
+    kitty_seq = TerminalGraphicsRenderer.image_to_kitty_escape(img)
+    assert "\033_Ga=T" in kitty_seq
+
+    proto = detect_graphics_protocol()
+    assert proto in ("iterm2", "kitty", "none")
+
+
+def test_tui_vim_and_theme_modals():
+    from term_stock_table.tui import StockTerminalApp, ThemeModal, FormulaModal
+
+    app = StockTerminalApp(symbols=["600519", "000001", "300750"], theme="tokyonight", use_real_data=False)
+    assert app.selected_index == 0
+
+    # Vim j / k
+    app.action_cursor_down()
+    assert app.selected_index == 1
+    app.action_cursor_up()
+    assert app.selected_index == 0
+
+    # Vim g / G
+    app.action_cursor_bottom()
+    assert app.selected_index == 2
+    app.action_cursor_top()
+    assert app.selected_index == 0
+
+    # Theme and Formula modals
+    thm_modal = ThemeModal()
+    assert thm_modal is not None
+    form_modal = FormulaModal()
+    assert form_modal is not None
+
+
+def test_extended_dim56_cli_commands():
+    from term_stock_table.cli import main as cli_main
+
+    with patch.object(sys, "argv", ["stk", "--tmux-layout"]):
+        with patch("sys.stdout", new_callable=io.StringIO) as mock_out:
+            cli_main()
+            assert "Tmux" in mock_out.getvalue()
+
+    with patch.object(sys, "argv", ["stk", "--pixel-chart", "600519", "--sim"]):
+        with patch("sys.stdout", new_callable=io.StringIO):
+            cli_main()
+
+    with patch.object(sys, "argv", ["stk", "--formula", "TYPICAL_PRICE", "--symbols", "600519"]):
+        with patch("sys.stdout", new_callable=io.StringIO) as mock_out:
+            cli_main()
+            assert "TYPICAL_PRICE" in mock_out.getvalue()
+
 
 

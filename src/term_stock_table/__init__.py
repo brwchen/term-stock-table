@@ -42,6 +42,10 @@ from .backtest import StrategyBacktester, BacktestResult
 from .webhook import WebhookDispatcher, WebhookConfig
 from .importer import PortfolioDataImporter
 from .statusline import StatuslineFormatter
+from .themes import ThemeManager, ThemeColors, THEMES
+from .formula import CustomFormula, FormulaManager, SafeFormulaEvaluator
+from .tmux import TmuxLayoutGenerator
+from .graphics import TerminalGraphicsRenderer, detect_graphics_protocol
 from .tui import StockTerminalApp
 
 __version__ = "0.1.0"
@@ -88,6 +92,15 @@ __all__ = [
     "WebhookConfig",
     "PortfolioDataImporter",
     "StatuslineFormatter",
+    "ThemeManager",
+    "ThemeColors",
+    "THEMES",
+    "CustomFormula",
+    "FormulaManager",
+    "SafeFormulaEvaluator",
+    "TmuxLayoutGenerator",
+    "TerminalGraphicsRenderer",
+    "detect_graphics_protocol",
     "load_watchlist",
     "save_watchlist",
     "add_to_watchlist",

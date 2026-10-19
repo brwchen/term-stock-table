@@ -31,6 +31,8 @@ from .market import render_indices_banner
 from .radar import MarketRadarTracker
 from .sector import SectorHeatmapTracker
 from .backtest import StrategyBacktester
+from .themes import ThemeManager, THEMES
+from .formula import FormulaManager, CustomFormula
 
 
 class AlertModal(ModalScreen[None]):
@@ -208,6 +210,48 @@ class BacktestModal(ModalScreen[None]):
         self.dismiss()
 
 
+class ThemeModal(ModalScreen[None]):
+    """Modal screen for selecting theme presets."""
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="alert-dialog"):
+            yield Label("🎨 Choose Color Theme Preset:", id="alert-title")
+            for key, th in THEMES.items():
+                yield Button(f"{key.upper()} - {th.description}", id=f"theme-{key}", variant="default")
+            yield Button("Close (Esc)", id="close-theme-btn", variant="primary")
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id and event.button.id.startswith("theme-"):
+            theme_key = event.button.id.replace("theme-", "")
+            self.app.theme_manager.set_theme(theme_key)
+            self.app.notify(f"Theme switched to: {theme_key.upper()}")
+            self.app.update_view()
+            self.dismiss()
+        else:
+            self.dismiss()
+
+    def key_escape(self) -> None:
+        self.dismiss()
+
+
+class FormulaModal(ModalScreen[None]):
+    """Modal screen for custom indicator formulas."""
+
+    def compose(self) -> ComposeResult:
+        formulas = FormulaManager.load_formulas()
+        with Vertical(id="alert-dialog"):
+            yield Label("📐 Custom Quantitative Formulas:", id="alert-title")
+            for name, f in formulas.items():
+                yield Label(f"• [bold cyan]{name}:[/] [yellow]{f.expression}[/] - [dim]{f.description}[/]")
+            yield Button("Close (Esc)", id="close-formula-btn", variant="primary")
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        self.dismiss()
+
+    def key_escape(self) -> None:
+        self.dismiss()
+
+
 class DetailModal(ModalScreen[None]):
     """Modal screen for comprehensive stock detail view."""
 
@@ -311,6 +355,12 @@ class StockTerminalApp(App):
         Binding("escape", "handle_escape", "Escape", priority=True),
         Binding("tab", "cycle_boss_profile", "Next Boss Disguise"),
         Binding("enter", "show_detail", "Stock Detail"),
+        Binding("j", "cursor_down", "Next Row (Vim)", show=False),
+        Binding("k", "cursor_up", "Prev Row (Vim)", show=False),
+        Binding("down", "cursor_down", "Down", show=False),
+        Binding("up", "cursor_up", "Up", show=False),
+        Binding("g", "cursor_top", "Top", show=False),
+        Binding("G", "cursor_bottom", "Bottom", show=False),
         Binding("n", "add_note", "Add Note"),
         Binding("l", "set_alert", "Price Alert"),
         Binding("a", "add_stock", "Add Stock"),
@@ -318,6 +368,8 @@ class StockTerminalApp(App):
         Binding("d", "delete_stock", "Delete Stock"),
         Binding("s", "cycle_sort", "Sort Column"),
         Binding("r", "reverse_sort", "Reverse Sort"),
+        Binding("T", "show_themes", "Theme Presets"),
+        Binding("F", "show_formulas", "Custom Formulas"),
         Binding("R", "show_radar", "Market Radar"),
         Binding("S", "show_sector", "Sector Heatmap"),
         Binding("B", "show_backtest", "Strategy Backtest"),
@@ -330,12 +382,14 @@ class StockTerminalApp(App):
         self,
         symbols: Optional[List[str]] = None,
         palette: str = "cn",
+        theme: str = "classic_cn",
         use_real_data: bool = True,
         refresh_interval: float = 1.0,
     ):
         super().__init__()
         self.symbols_list = symbols or load_watchlist()
         self.palette = palette
+        self.theme_manager = ThemeManager(theme or palette)
         self.use_real_data = use_real_data
         self.refresh_interval = refresh_interval
         self.trackers: List[StockDataTracker] = [
@@ -500,6 +554,42 @@ class StockTerminalApp(App):
             remove_from_watchlist(tr.symbol)
             self.notify(f"Removed {tr.symbol} from watchlist.")
             self.refresh_trackers_from_disk()
+
+    def action_cursor_down(self) -> None:
+        """Vim 'j' / Down: Move highlighted stock selection down."""
+        if self.trackers:
+            self.selected_index = (self.selected_index + 1) % len(self.trackers)
+            tr = self.trackers[self.selected_index]
+            self.notify(f"Selected: {tr.name} ({tr.symbol})")
+
+    def action_cursor_up(self) -> None:
+        """Vim 'k' / Up: Move highlighted stock selection up."""
+        if self.trackers:
+            self.selected_index = (self.selected_index - 1) % len(self.trackers)
+            tr = self.trackers[self.selected_index]
+            self.notify(f"Selected: {tr.name} ({tr.symbol})")
+
+    def action_cursor_top(self) -> None:
+        """Vim 'g' / Home: Jump to first stock."""
+        if self.trackers:
+            self.selected_index = 0
+            tr = self.trackers[0]
+            self.notify(f"Selected (Top): {tr.name} ({tr.symbol})")
+
+    def action_cursor_bottom(self) -> None:
+        """Vim 'G' / End: Jump to last stock."""
+        if self.trackers:
+            self.selected_index = len(self.trackers) - 1
+            tr = self.trackers[-1]
+            self.notify(f"Selected (Bottom): {tr.name} ({tr.symbol})")
+
+    def action_show_themes(self) -> None:
+        """Open theme preset switcher modal."""
+        self.push_screen(ThemeModal())
+
+    def action_show_formulas(self) -> None:
+        """Open custom formulas modal."""
+        self.push_screen(FormulaModal())
 
     def action_show_radar(self) -> None:
         """Open market sentiment and anomaly radar modal."""

@@ -50,6 +50,18 @@ Built on top of [`term-sparkline`](https://github.com/brwchen/term-sparkline) fo
   - Two-way CSV portfolio position import/export (`stk --import-csv` / `stk --export-csv`).
 - **Tmux & WezTerm Statusline Component (极客状态栏小组件)**:
   - Single-line compact ticker string for terminal status bars (`stk --statusline`).
+- **Theme Ecosystem & Custom Visual Palettes (主题生态与个性化配色)**:
+  - 8 curated visual themes: **Bloomberg Terminal Classic**, **Tokyo Night**, **Catppuccin Mocha**, **Cyberpunk Neon**, **Nord Frost**, **Gruvbox Retro**, plus **Classic CN** (Red ▲) and **Classic US** (Green ▲).
+  - Press <kbd>T</kbd> in TUI to switch themes dynamically with instant persistent storage or run `stk --theme tokyo-night`.
+- **Custom Indicator Formula Scripting Engine (AST 自定义指标公式系统)**:
+  - Safe sandboxed Python AST parser supporting math expressions, moving averages, standard deviation, and custom quant oscillators (`MA`, `EMA`, `STD`, `TYPICAL_PRICE`, `DEV_MA20_PCT`, `INTRADAY_AMPLITUDE`).
+  - Press <kbd>F</kbd> in TUI to evaluate or test custom formula expressions, or run `stk --formula TYPICAL_PRICE --symbols 600519`.
+- **Geek Multi-Pane Tmux Trading Floor Layout (Tmux 多窗格极客工作站)**:
+  - Generate or launch a 4-pane tmux trading station with synchronized Watchlist, Sector Heatmap, Anomaly Radar, and Real-time Tape (`stk tmux-launch` / `stk --tmux-layout`).
+- **Kitty & iTerm2 Inline Pixel Graphics Protocol (终端矢量/像素原图渲染)**:
+  - Native inline PNG candlestick chart rendering using Kitty graphics protocol (`_Ga=T`) and iTerm2 inline image protocol (`]1337;File=inline=1`) (`stk --pixel-chart 600519`).
+- **Full Vim Ergonomics (极客 Vim 快捷键导航)**:
+  - Seamless Vim navigation: <kbd>j</kbd>/<kbd>k</kbd> step rows, <kbd>g</kbd> jump to top, <kbd>G</kbd> jump to bottom, <kbd>/</kbd> quick search.
 - **Stealth Boss Mode (摸鱼神器 / Boss Key)**:
   - Press <kbd>b</kbd> or <kbd>ESC</kbd> to instantly camouflage into real-time system monitoring or developer logs:
     - **DevOps Profile**: Linux `top` / `htop` dynamic process table.
@@ -148,6 +160,10 @@ stk --boss --boss-profile cpp
 
 | Key | Action | Description |
 |:---:|:---|:---|
+| <kbd>j</kbd> / <kbd>k</kbd> / <kbd>↓</kbd> / <kbd>↑</kbd> | **Navigate** | Move cursor down/up in table (Vim navigation) |
+| <kbd>g</kbd> / <kbd>G</kbd> | **Home / End** | Jump to top / bottom of watchlist |
+| <kbd>T</kbd> | **Theme Selector** | Open theme picker (Bloomberg, Tokyo Night, Catppuccin, Cyberpunk, Nord, Gruvbox) |
+| <kbd>F</kbd> | **Custom Formula** | Open safe AST indicator formula expression calculator |
 | <kbd>b</kbd> / <kbd>ESC</kbd> | **Boss Key (摸鱼模式)** | Instantly toggles camouflage profile |
 | <kbd>Tab</kbd> | **Next Boss Profile** | Cycles camouflage disguise (DevOps → K8s → Neovim → GDB → C++ → Git → PyTorch → Nginx → Mono) |
 | <kbd>Enter</kbd> | **Stock Detail View** | Opens deep detail page (OHLC, Indicators, 5-Level Depth, Capital Flow, Notes) |
