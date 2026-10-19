@@ -24,6 +24,7 @@ from .config import (
 )
 from .table import create_stock_table
 from .detail import render_stock_detail
+from .inline_spark import set_image_enabled
 from .boss import render_boss_view, PROFILES
 from .portfolio import calculate_portfolio_pnl, create_portfolio_table
 from .alerts import evaluate_alerts
@@ -387,6 +388,7 @@ class StockTerminalApp(App):
         refresh_interval: float = 1.0,
     ):
         super().__init__()
+        set_image_enabled(False)
         self.symbols_list = symbols or load_watchlist()
         self.palette = palette
         self.theme_manager = ThemeManager(theme or palette)

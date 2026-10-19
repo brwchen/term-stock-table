@@ -6,8 +6,8 @@ from rich.table import Table
 from rich.layout import Layout
 from rich.text import Text
 from rich.box import ROUNDED, SIMPLE, DOUBLE_EDGE
-from term_sparkline import sparkline, price_volume_sparkline
-from .inline_spark import smart_spark
+from term_sparkline import sparkline
+from .inline_spark import AutoCurve
 from .api import StockDataTracker
 from .indicators import (
     compute_bollinger_bands,
@@ -103,15 +103,9 @@ def render_stock_detail(
         chart_content.append("─── Multi-Period Candlestick (K-Line) ───\n", style="bold gold1")
         chart_content.append(Text.from_ansi(candle_str))
     else:
-        combo_spark = price_volume_sparkline(
-            price_list,
-            vol_list,
-            mode="braille",
-            palette=palette,
-            annotate=True,
-        )
-        chart_content.append("─── Intraday Price & Volume Combo ───\n", style="bold gold1")
-        chart_content.append(Text.from_ansi(combo_spark))
+        vol_bars = sparkline(vol_list, length=40, mode="block", palette=palette, annotate=False)
+        chart_content.append("─── Intraday Volume ───\n", style="bold gold1")
+        chart_content.append(Text.from_ansi(vol_bars))
 
     chart_content.append("\n\n─── Technical & Quant Indicators ───\n", style="bold gold1")
     chart_content.append(f"• Moving Avg  : MA5={ma5:.2f} | MA10={ma10:.2f} | MA20={ma20:.2f}\n", style="dim white")
@@ -123,7 +117,7 @@ def render_stock_detail(
         Panel(
             Group(
                 Text("─── Smooth Price Curve ───", style="bold gold1"),
-                smart_spark(price_list, 60, palette, fill=True, show_dot=True),
+                AutoCurve(price_list, rows=5, palette=palette),
                 Text(""),
                 chart_content,
             ),
