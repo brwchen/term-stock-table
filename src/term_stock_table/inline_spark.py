@@ -32,6 +32,7 @@ def braille_curve(
     palette: str = "cn",
     fill: bool = False,
     baseline: Optional[float] = None,
+    up: Optional[bool] = None,
 ) -> Text:
     """Connected braille line chart: (2*width) x (4*rows) dots, continuous like a smooth curve."""
     data = [float(v) for v in series]
@@ -61,10 +62,11 @@ def braille_curve(
             spans.append((y, y))
 
     grid = [[0] * width for _ in range(rows)]
+    area = [[0] * width for _ in range(rows)]
 
-    def plot(x: int, y: int) -> None:
+    def plot(x: int, y: int, target=None) -> None:
         row, dy = divmod(ph - 1 - y, 4)
-        grid[row][x // 2] |= _BRAILLE_BITS[dy][x % 2]
+        (target or grid)[row][x // 2] |= _BRAILLE_BITS[dy][x % 2]
 
     prev_mid = None
     for x, (y_lo, y_hi) in enumerate(spans):
@@ -77,13 +79,24 @@ def braille_curve(
             plot(x, yy)
         if fill:
             for yy in range(0, lo_y):
-                if (x + yy) % 2 == 0:
-                    plot(x, yy)
+                plot(x, yy, area)
 
-    up = data[-1] >= data[0]
-    red, green = "bright_red", "bright_green"
-    style = (red if up else green) if palette == "cn" else (green if up else red)
-    return Text("\n".join("".join(chr(0x2800 + c) for c in r) for r in grid), style=style)
+    if up is None:
+        up = data[-1] >= data[0]
+    red, green = ("bright_red", "bright_green")
+    dim_red, dim_green = ("red3", "green4")
+    is_red = up if palette == "cn" else not up
+    style = red if is_red else green
+    dim_style = dim_red if is_red else dim_green
+    text = Text()
+    for r in range(rows):
+        if r:
+            text.append("\n")
+        for c in range(width):
+            line_bits, area_bits = grid[r][c], area[r][c]
+            ch = chr(0x2800 + (line_bits | area_bits))
+            text.append(ch, style=style if line_bits else dim_style)
+    return text
 
 
 class AutoCurve:
@@ -125,8 +138,8 @@ def smart_spark(
     """Smooth image curve on iTerm2-like terminals, connected braille curve elsewhere."""
     data = list(series)
     if rows == 1 and len(data) >= 2 and sys.stdout.isatty() and image_sparklines_supported():
-        return InlineSparkCell(data, length, annotation, palette=palette, **kwargs)
-    text = braille_curve(data, length, rows, palette, fill=bool(kwargs.get("fill")))
+        return InlineSparkCell(data, length, annotation, palette=palette, **{k: v for k, v in kwargs.items() if k != "up"})
+    text = braille_curve(data, length, rows, palette, fill=bool(kwargs.get("fill")), up=kwargs.get("up"))
     if annotation is not None:
         lines = text.split("\n")
         lines[0].append(" ")

@@ -123,9 +123,10 @@ def create_stock_table(
         # Sparkline Curve
         note = None
         if not monochrome and len(price_list) >= 2:
-            pct = (price_list[-1] / price_list[0] - 1) * 100 if price_list[0] else 0.0
-            note = Text(f"[{price_list[-1]:.2f} {pct:+.2f}%]")
-        spark_text = smart_spark(price_list, 20, palette, note, rows=spark_rows, fill=False, show_dot=False)
+            note = Text(f"[{tr.price:.2f} {tr.change_pct:+.2f}%]", style=color_style)
+        spark_text = smart_spark(
+            price_list, 20, palette, note, rows=spark_rows, fill=True, up=(tr.change_pct >= 0), show_dot=False
+        )
 
         sym_display = tr.symbol
         if alerts_triggered and tr.symbol in alerts_triggered:
