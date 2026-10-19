@@ -26,6 +26,11 @@ def main():
         description="Professional real-time terminal stock monitoring table, technical indicators, detail views, and stealth boss mode."
     )
     parser.add_argument(
+        "--version", "-v",
+        action="version",
+        version="term-stock-table 0.1.0"
+    )
+    parser.add_argument(
         "--symbols", "-s",
         type=str,
         default=None,
