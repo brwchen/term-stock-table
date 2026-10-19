@@ -1,0 +1,64 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "term-stock-table"
+version = "0.1.0"
+description = "Professional real-time terminal stock monitoring table, technical indicators, detail views, notes, and stealth boss mode."
+readme = "README.md"
+requires-python = ">=3.8"
+license = "MIT"
+authors = [
+    { name = "brwchen", email = "brwchen@users.noreply.github.com" },
+]
+keywords = [
+    "stock",
+    "table",
+    "terminal",
+    "finance",
+    "market",
+    "tui",
+    "sparkline",
+    "rich",
+    "textual",
+    "bollinger-bands",
+    "boss-mode",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Financial and Insurance Industry",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Programming Language :: Python :: 3.15",
+    "Topic :: Office/Business :: Financial :: Investment",
+    "Topic :: Terminals",
+]
+dependencies = [
+    "term-sparkline>=0.7.0",
+    "rich>=12.0.0",
+    "textual>=0.40.0",
+]
+
+[project.optional-dependencies]
+image = ["Pillow>=9.0.0"]
+test = ["pytest>=7.0.0", "pytest-cov>=4.0.0"]
+
+[project.scripts]
+stk = "term_stock_table.cli:main"
+stock-table = "term_stock_table.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/brwchen/term-stock-table"
+Repository = "https://github.com/brwchen/term-stock-table"
+Issues = "https://github.com/brwchen/term-stock-table/issues"
