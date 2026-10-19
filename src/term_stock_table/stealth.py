@@ -68,34 +68,10 @@ def level_for(change_pct: float) -> tuple:
     return "INFO ", "green"
 
 
-def render_log_view(trackers: List[StockDataTracker], selected_symbol: Optional[str] = None) -> Table:
-    """Service-status table: alias, price, change, position and live trend per holding."""
-    from .config import load_portfolio
-
-    portfolio = load_portfolio()
-    table = Table(box=SIMPLE_HEAD, expand=False, header_style="bold grey70", pad_edge=False)
-    table.add_column("SERVICE", style="cyan", no_wrap=True)
-    table.add_column("VALUE", justify="right", no_wrap=True)
-    table.add_column("DELTA", justify="right", no_wrap=True)
-    table.add_column("REPLICAS", justify="right", no_wrap=True)
-    table.add_column("TREND", no_wrap=True)
-    for tr in trackers:
-        prices = list(tr.prices)
-        if not prices:
-            continue
-        prev = tr.prev_close or prices[0]
-        pct = (prices[-1] - prev) / prev * 100 if prev else 0.0
-        shares = float((portfolio.get(tr.symbol) or {}).get("shares", 0) or 0)
-        style = "bold white" if tr.symbol == selected_symbol else "white"
-        tone = "orange3" if pct < 0 else "deep_sky_blue1"
-        table.add_row(
-            Text(service_name(tr.symbol, tr.name), style="bold cyan" if tr.symbol == selected_symbol else "cyan"),
-            Text(f"{prices[-1]:,.2f}", style=style),
-            Text(f"{pct:+.2f}%", style=tone),
-            Text(f"{shares:,.0f}" if shares else "-", style=style),
-            braille_curve(prices[-60:], width=24, rows=1, color=tone, baseline=prev),
-        )
-    return table
+def render_log_view(trackers: List[StockDataTracker], selected_symbol: Optional[str] = None):
+    """Main-screen disguise: a top process list with the holdings mixed in."""
+    from .boss import render_devops_top
+    return render_devops_top(trackers, selected_symbol)
 
 
 def quantile(values: List[float], q: float) -> float:

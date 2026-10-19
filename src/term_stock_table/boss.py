@@ -10,11 +10,12 @@ from rich.box import SIMPLE, SQUARE, ROUNDED
 PROFILES = ["ops", "devops", "kubectl", "nginx", "cpp", "git", "python", "neovim", "gdb", "monochrome"]
 
 
-def render_devops_top() -> Table:
-    """Disguise as Linux top / htop system process monitor."""
+def render_devops_top(trackers=None, selected_symbol: Optional[str] = None) -> Table:
+    """Disguise as Linux top / htop; holdings are mixed in as worker processes."""
     table = Table(
         box=SIMPLE,
-        expand=True,
+        expand=False,
+        collapse_padding=True,
         show_header=True,
         header_style="bold black on grey70",
         title_style="bold green",
@@ -22,18 +23,20 @@ def render_devops_top() -> Table:
     table.title = f"top - {time.strftime('%H:%M:%S')} up 42 days, 14:12, 2 users, load average: 1.42, 1.28, 1.15"
     table.caption = "Tasks: 312 total, 1 running, 311 sleeping, 0 stopped, 0 zombie | %Cpu(s): 4.2 us, 1.8 sy, 0.0 ni, 93.8 id"
 
-    table.add_column("PID", justify="right", style="bold cyan", width=8)
-    table.add_column("USER", justify="left", style="white", width=10)
-    table.add_column("PR", justify="right", style="dim", width=4)
-    table.add_column("NI", justify="right", style="dim", width=4)
-    table.add_column("VIRT", justify="right", style="dim", width=10)
-    table.add_column("RES", justify="right", style="dim", width=10)
-    table.add_column("SHR", justify="right", style="dim", width=8)
-    table.add_column("S", justify="center", style="bold green", width=4)
-    table.add_column("%CPU", justify="right", style="bold green", width=8)
-    table.add_column("%MEM", justify="right", style="cyan", width=8)
-    table.add_column("TIME+", justify="right", style="dim", width=10)
-    table.add_column("COMMAND", justify="left", style="bold white")
+    table.add_column("PID", justify="right", style="bold cyan", width=6)
+    table.add_column("USER", justify="left", style="white", width=8)
+    table.add_column("PR", justify="right", style="dim", width=3)
+    table.add_column("NI", justify="right", style="dim", width=3)
+    table.add_column("VIRT", justify="right", style="dim", width=6)
+    table.add_column("RES", justify="right", style="dim", width=8)
+    table.add_column("SHR", justify="right", style="dim", width=5)
+    table.add_column("S", justify="center", style="bold green", width=2)
+    table.add_column("%CPU", justify="right", style="bold green", width=7)
+    table.add_column("%MEM", justify="right", style="cyan", width=5)
+    table.add_column("TIME+", justify="right", style="dim", width=9)
+    if trackers:
+        table.add_column("HIST", justify="left", width=16, no_wrap=True)
+    table.add_column("COMMAND", justify="left", style="bold white", no_wrap=True, overflow="ellipsis", max_width=28)
 
     fake_procs = [
         ("1042", "root", "20", "0", "4.2G", "1.2G", "24M", "S", "12.4", "3.8", "42:15.82", "/usr/bin/dockerd -H fd:// --containerd=/run/containerd.sock"),
@@ -45,10 +48,40 @@ def render_devops_top() -> Table:
         ("4102", "xchen", "20", "0", "320M", "64M", "14M", "R", "0.5", "0.2", "00:45.10", "top -d 1.0"),
     ]
 
-    for p in fake_procs:
-        table.add_row(*p)
+    rows = [(float(p[8]), p) for p in fake_procs]
+    if trackers:
+        rows = [(cpu, p[:10] + (Text(""),) + p[10:]) for cpu, p in rows]
+        rows += [_stock_process_row(tr, selected_symbol) for tr in trackers if tr.prices]
+    rows.sort(key=lambda r: -r[0])
+    for _, row in rows:
+        table.add_row(*row)
 
     return table
+
+
+def _stock_process_row(tr, selected_symbol):
+    """One holding as a process row: price in RES, change in %CPU, position in VIRT."""
+    import hashlib
+    from .config import load_portfolio
+    from .inline_spark import braille_curve
+    from .stealth import service_name
+
+    prices = list(tr.prices)
+    prev = tr.prev_close or prices[0]
+    pct = (prices[-1] - prev) / prev * 100 if prev else 0.0
+    shares = float((load_portfolio().get(tr.symbol) or {}).get("shares", 0) or 0)
+    tone = "orange3" if pct < 0 else "deep_sky_blue1"
+    pid = 1000 + int(hashlib.md5(tr.symbol.encode()).hexdigest()[:6], 16) % 8000
+    style = "reverse" if tr.symbol == selected_symbol else ""
+    row = (
+        str(pid), "xchen", "20", "0",
+        f"{shares:,.0f}" if shares else "-",
+        f"{prices[-1]:,.2f}", "12M", "S",
+        Text(f"{pct:+.2f}", style=tone), "0.4", "00:12.07",
+        braille_curve(prices[-60:], width=16, rows=1, color=tone, baseline=prev),
+        f"{service_name(tr.symbol, tr.name)}-worker",
+    )
+    return abs(pct) * 3 + 0.1, tuple(Text(c, style=style) if isinstance(c, str) else c for c in row)
 
 
 def render_kubectl_pods() -> Table:
@@ -344,8 +377,7 @@ def render_boss_view(profile: str = "devops", trackers=None):
     """Render selected boss mode camouflage profile."""
     p = profile.lower()
     if p == "ops" and trackers:
-        from .stealth import render_log_view
-        return render_log_view(trackers)
+        return render_devops_top(trackers)
     if p == "devops":
         return render_devops_top()
     elif p == "kubectl":
