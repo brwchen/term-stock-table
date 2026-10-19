@@ -94,8 +94,6 @@ class DetailHeader:
         title = Text()
         title.append(tr.name, style="bold bright_white")
         title.append(f"  {tr.symbol}", style="dim")
-        title.append("   ▴ " if self.expanded else "   ▾ ", style="bold cyan")
-        title.append(t("d_collapse") if self.expanded else t("d_expand"), style="cyan")
 
         price = Text()
         price.append(f"{tr.price:.2f}\n", style=f"bold {style}")
@@ -126,7 +124,10 @@ class DetailHeader:
         outer.add_column(width=max(16, len(price.plain.split("\n")[1]) + 2))
         outer.add_column(justify="right", ratio=1)
         outer.add_row(price, grid)
-        yield Panel(Group(Align.center(title), outer), box=ROUNDED, border_style="cyan", padding=(0, 1))
+        yield Panel(
+            Group(Align.center(title), outer), box=ROUNDED, border_style="cyan", padding=(0, 1),
+            subtitle=Text("▴ " if self.expanded else "▾ ", style="bold cyan"), subtitle_align="right",
+        )
 
     def extra_grid(self) -> Panel:
         tr = self.tracker

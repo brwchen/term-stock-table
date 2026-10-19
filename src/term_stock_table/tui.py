@@ -372,6 +372,7 @@ class DetailModal(ScrollKeysMixin, ModalScreen[None]):
         popup = self.query_one("#detail-popup", Static)
         popup.update(render_detail_popup(self.tracker, self.palette))
         popup.display = self.header_expanded
+        self.place_popup()
         layout = render_detail_body(
             self.tracker,
             palette=self.palette,
@@ -411,6 +412,16 @@ class DetailModal(ScrollKeysMixin, ModalScreen[None]):
             self.app.push_screen(NoteModal(self.tracker.symbol, self.tracker.name))
         else:
             self.dismiss()
+
+    POPUP_WIDTH = 46
+
+    def place_popup(self) -> None:
+        """Right-align the drop-down under the header corner (layer children are centred by default)."""
+        width = self.query_one("#detail-header").size.width or self.size.width
+        self.query_one("#detail-popup").styles.offset = ((width - self.POPUP_WIDTH) // 2, -3)
+
+    def on_resize(self, event) -> None:
+        self.call_after_refresh(self.place_popup)
 
     def toggle_header(self) -> None:
         self.header_expanded = not self.header_expanded
@@ -513,7 +524,7 @@ class StockTerminalApp(App):
         layer: popup;
         display: none;
         height: auto;
-        width: 100%;
+        width: 46;
         offset: 0 -3;
         background: #0f1117;
     }
