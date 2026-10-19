@@ -210,7 +210,7 @@ class ScrollKeysMixin:
 
     def action_scroll_view(self, direction: str) -> None:
         view = self.query_one("#detail-scroll")
-        getattr(view, f"scroll_{direction}")(animate=False)
+        getattr(view, f"scroll_{direction}")(animate=True, duration=0.15, easing="out_cubic")
 
 
 class RadarModal(ScrollKeysMixin, ModalScreen[None]):
@@ -633,10 +633,10 @@ class StockTerminalApp(App):
             return
         scroll = self.query_one("#main-scroll")
         if self.selected_index == 0:
-            scroll.scroll_home(animate=False)
+            scroll.scroll_home(animate=True, duration=0.15, easing="out_cubic")
             return
         y = self.TABLE_HEADER_LINES + self.selected_index * self.row_height
-        scroll.scroll_to_region(Region(0, y, 1, self.row_height), animate=False)
+        scroll.scroll_to_region(Region(0, y, 1, self.row_height), animate=True, duration=0.15, easing="out_cubic")
 
     def overlay_payload(self) -> str:
         if not self.overlay_items or len(self.screen_stack) > 1:
