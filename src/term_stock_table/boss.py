@@ -7,7 +7,7 @@ from rich.panel import Panel
 from rich.text import Text
 from rich.box import SIMPLE, SQUARE, ROUNDED
 
-PROFILES = ["devops", "kubectl", "nginx", "cpp", "git", "python", "neovim", "gdb", "monochrome"]
+PROFILES = ["ops", "devops", "kubectl", "nginx", "cpp", "git", "python", "neovim", "gdb", "monochrome"]
 
 
 def render_devops_top() -> Table:
@@ -343,6 +343,9 @@ def render_gdb_debugger() -> Panel:
 def render_boss_view(profile: str = "devops", trackers=None):
     """Render selected boss mode camouflage profile."""
     p = profile.lower()
+    if p == "ops" and trackers:
+        from .stealth import render_log_view
+        return render_log_view(trackers)
     if p == "devops":
         return render_devops_top()
     elif p == "kubectl":

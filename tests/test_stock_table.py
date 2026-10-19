@@ -479,13 +479,13 @@ def test_tui_app_actions():
     app = StockTerminalApp(symbols=["600519", "AAPL"], palette="cn", use_real_data=False)
     
     # Test boss mode toggling
-    assert app.is_boss_mode is False
+    assert app.stealth is False
     app.action_toggle_boss()
-    assert app.is_boss_mode is True
+    assert app.stealth is True
     app.action_cycle_boss_profile()
     assert app.boss_profile_idx == 1
     app.action_toggle_boss()
-    assert app.is_boss_mode is False
+    assert app.stealth is False
 
     # Test palette toggle
     assert app.palette == "cn"
@@ -859,7 +859,7 @@ def test_stealth_view_hides_market_identity():
         app = StockTerminalApp(symbols=["600519", "AAPL"], use_real_data=False)
         async with app.run_test(size=(110, 40)) as pilot:
             await pilot.pause(1.0)
-            await pilot.press("m")
+            await pilot.press("b")
             await pilot.pause(0.4)
             screen = "\n".join(s.text for s in app.screen._compositor.render_strips())
             assert "svc-" in screen and "600519" not in screen and "AAPL" not in screen
@@ -868,7 +868,7 @@ def test_stealth_view_hides_market_identity():
             screen = "\n".join(s.text for s in app.screen._compositor.render_strips())
             assert "p99 latency" in screen and "600519" not in screen
             await pilot.press("escape")
-            await pilot.press("m")
+            await pilot.press("b")
             assert app.stealth is False
 
             app.idle_seconds = 0.5

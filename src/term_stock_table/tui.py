@@ -597,7 +597,6 @@ class StockTerminalApp(App):
 
     BINDINGS = [
         Binding("b", "toggle_boss", "Boss Key", priority=True),
-        Binding("m", "toggle_stealth", "Stealth View", priority=True),
         Binding("ctrl+b", "toggle_boss(False)", "Boss Key", show=False, priority=True),
         Binding("escape", "handle_escape", "Escape", priority=True),
         Binding("tab", "cycle_boss_profile", "Next Boss Disguise"),
@@ -627,7 +626,7 @@ class StockTerminalApp(App):
     ]
 
     BINDING_LABELS = {
-        ("b", "toggle_boss"): "b_boss", ("m", "toggle_stealth"): "b_stealth", ("escape", "handle_escape"): "b_escape",
+        ("b", "toggle_boss"): "b_boss", ("escape", "handle_escape"): "b_escape",
         ("tab", "cycle_boss_profile"): "b_tab", ("enter", "show_detail"): "b_enter",
         ("n", "add_note"): "b_note", ("l", "set_alert"): "b_alert", ("a", "add_stock"): "b_add",
         ("slash", "add_stock"): "b_search", ("d", "delete_stock"): "b_delete",
@@ -872,13 +871,8 @@ class StockTerminalApp(App):
             if isinstance(scr, DetailModal):
                 scr.update_content()
 
-    def action_toggle_stealth(self) -> None:
-        if self.screen_stack and isinstance(self.focused, Input):
-            self.focused.insert_text_at_cursor("m")
-            return
-        self.stealth = not self.stealth
-        self.stealth_auto = False
-        self.apply_stealth()
+    def ops_profile(self) -> bool:
+        return PROFILES[self.boss_profile_idx % len(PROFILES)] == "ops"
 
     def engage_auto_stealth(self) -> None:
         """Disguise everything after inactivity or when the terminal loses focus."""
@@ -886,9 +880,15 @@ class StockTerminalApp(App):
             return
         if len(self.screen_stack) > 1 and not isinstance(self.top_screen(), DetailModal):
             self.push_screen(BossScreen(self.boss_renderable()))
-        if not self.stealth:
-            self.stealth, self.stealth_auto = True, True
+        if self.stealth or self.is_boss_mode:
+            return
+        self.stealth_auto = True
+        if self.ops_profile():
+            self.stealth = True
             self.apply_stealth()
+        else:
+            self.is_boss_mode = True
+            self.update_view()
 
     def stealth_idle_tick(self) -> None:
         if self.idle_seconds > 0 and time.monotonic() - self.last_activity > self.idle_seconds:
@@ -916,10 +916,18 @@ class StockTerminalApp(App):
         if from_key and self.screen_stack and isinstance(self.focused, Input):
             self.focused.insert_text_at_cursor("b")
             return
-        if isinstance(self.top_screen(), BossScreen):
+        self.stealth_auto = False
+        top = self.top_screen()
+        if isinstance(top, BossScreen):
             self.pop_screen()
+        elif isinstance(top, DetailModal) and self.ops_profile() and not self.is_boss_mode:
+            self.stealth = not self.stealth
+            self.apply_stealth()
         elif len(self.screen_stack) > 1:
             self.push_screen(BossScreen(self.boss_renderable()))
+        elif self.ops_profile():
+            self.stealth = not self.stealth
+            self.apply_stealth()
         else:
             self.is_boss_mode = not self.is_boss_mode
             self.update_view()
@@ -936,9 +944,12 @@ class StockTerminalApp(App):
         if isinstance(self.top_screen(), BossScreen):
             self.boss_profile_idx = (self.boss_profile_idx + 1) % len(PROFILES)
             self.screen.query_one("#boss-view", Static).update(self.boss_renderable())
-        elif self.is_boss_mode:
+        elif self.is_boss_mode or self.stealth:
             self.boss_profile_idx = (self.boss_profile_idx + 1) % len(PROFILES)
-            self.update_view()
+            ops = self.ops_profile()
+            self.is_boss_mode = not ops
+            self.stealth = ops
+            self.apply_stealth()
 
     def action_toggle_portfolio(self) -> None:
         """Toggle between Watchlist and Portfolio asset view."""
