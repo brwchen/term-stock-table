@@ -73,9 +73,7 @@ Built on top of [`term-sparkline`](https://github.com/brwchen/term-sparkline) fo
     - **PyTorch ML Profile**: Deep learning training epoch loss loop.
     - **Nginx Profile**: `tail -f /var/log/nginx/access.log` HTTP stream.
     - **Monochrome Profile**: Grayscale neutral sensor telemetry table without market colors.
-- **Dual Runtime Architecture**:
-  - **Interactive TUI** (`stk`): Full-featured Textual terminal dashboard with keyboard shortcuts.
-  - **CLI Pipeline** (`stk --print` / `stk --watch`): Snapshot Rich tables for scripts, cron jobs, and tmux status bars.
+- **Interactive TUI** (`stk`): Full-featured Textual terminal dashboard with keyboard shortcuts, sorting and smooth image curves on iTerm2.
 
 ---
 
@@ -121,12 +119,9 @@ stk --alert 600519 high=1800 low=1200 pct=3.0
 stk --alerts
 ```
 
-### 4. Print Snapshot Table & Sorting (CLI Mode)
+### 4. Indices & Reports
 
 ```bash
-# Sort by price change percentage descending
-stk --print --sort change_pct
-
 # Display global major indices banner
 stk --indices
 

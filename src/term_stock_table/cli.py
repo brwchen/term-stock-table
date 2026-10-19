@@ -1,9 +1,7 @@
 """Command Line Interface for term-stock-table."""
 import argparse
 import sys
-import time
 from rich.console import Console
-from rich.live import Live
 
 from .api import StockDataTracker, fetch_live_quotes
 from .config import (
@@ -20,11 +18,9 @@ from .config import (
     save_alert,
     remove_alert,
 )
-from .table import create_stock_table
 from .detail import render_stock_detail
 from .boss import render_boss_view, PROFILES, export_daily_review
 from .portfolio import calculate_portfolio_pnl, create_portfolio_table, Position
-from .alerts import evaluate_alerts
 from .market import render_indices_banner
 from .radar import MarketRadarTracker
 from .tick import IntradayChartRenderer, ChipProfileRenderer, TickTapeRenderer
@@ -87,16 +83,6 @@ def main():
         help="Render inline high-resolution candlestick chart using iTerm2 / Kitty graphics protocol"
     )
     parser.add_argument(
-        "--print",
-        action="store_true",
-        help="Print single static Rich table snapshot to stdout and exit"
-    )
-    parser.add_argument(
-        "--watch", "-w",
-        action="store_true",
-        help="Run live refreshing terminal loop (Rich Live mode)"
-    )
-    parser.add_argument(
         "--interval", "-i",
         type=float,
         default=1.0,
@@ -106,17 +92,6 @@ def main():
         "--sim",
         action="store_true",
         help="Force offline simulation engine instead of live quote API"
-    )
-    parser.add_argument(
-        "--sort",
-        choices=["change_pct", "price", "volume", "amount", "amplitude", "turnover_rate", "symbol", "pe"],
-        default=None,
-        help="Sort table by specific column"
-    )
-    parser.add_argument(
-        "--asc",
-        action="store_true",
-        help="Sort in ascending order (default is descending)"
     )
     parser.add_argument(
         "--indices",
@@ -544,59 +519,7 @@ def main():
         console.print(f"[bold green]✓ Daily Review report exported to {args.export_daily}[/]")
         return
 
-    # 9. Print Snapshot Mode
-    if args.print:
-        # Check alerts
-        triggered = evaluate_alerts([tr.to_dict() for tr in trackers], trigger_notification=False)
-        table = create_stock_table(
-            trackers,
-            palette=args.palette,
-            is_live=is_live,
-            sort_by=args.sort,
-            reverse=(not args.asc),
-            alerts_triggered=triggered,
-        )
-        console.print(table)
-        return
-
-    # 10. Live Watch Loop Mode (Rich Live)
-    if args.watch:
-        try:
-            with Live(console=console, screen=True, refresh_per_second=int(1 / max(0.1, args.interval))) as live:
-                while True:
-                    is_live = False
-                    if not args.sim:
-                        quotes = fetch_live_quotes(symbols_list, timeout=1.5)
-                        if quotes:
-                            is_live = True
-                            for tr in trackers:
-                                if tr.symbol in quotes:
-                                    tr.update_from_quote(quotes[tr.symbol])
-                                else:
-                                    tr.tick_simulation()
-                        else:
-                            for tr in trackers:
-                                tr.tick_simulation()
-                    else:
-                        for tr in trackers:
-                            tr.tick_simulation()
-
-                    triggered = evaluate_alerts([tr.to_dict() for tr in trackers], trigger_notification=True)
-                    tbl = create_stock_table(
-                        trackers,
-                        palette=args.palette,
-                        is_live=is_live,
-                        sort_by=args.sort,
-                        reverse=(not args.asc),
-                        alerts_triggered=triggered,
-                    )
-                    live.update(tbl)
-                    time.sleep(args.interval)
-        except KeyboardInterrupt:
-            pass
-        return
-
-    # 11. Default Interactive TUI Mode (Textual)
+    # 9. Default Interactive TUI Mode (Textual)
     app = StockTerminalApp(
         symbols=symbols_list,
         palette=args.palette,

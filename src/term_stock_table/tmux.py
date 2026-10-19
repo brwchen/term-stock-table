@@ -37,7 +37,7 @@ class TmuxLayoutGenerator:
             "fi",
             "",
             "# 1. Create main session with Left Pane (Watchlist Table)",
-            f"tmux new-session -d -s $SESSION -n 'TradeStation' \"stk --symbols {sym_str} --watch --interval 1.0\"",
+            f"tmux new-session -d -s $SESSION -n 'TradeStation' \"stk --symbols {sym_str} --interval 1.0\"",
             "",
             "# 2. Split vertically for Right Column",
             "tmux split-window -h -t $SESSION:0.0 -p 50",

@@ -7,6 +7,6 @@ Set Padding 12
 Set Theme "Catppuccin Mocha"
 Set TypingSpeed 40ms
 
-Type "stk --print --sim"
+Type "stk --sim"
 Enter
 Sleep 4s

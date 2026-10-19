@@ -472,21 +472,6 @@ def test_cli_commands():
                 with patch("sys.stdout", new_callable=io.StringIO):
                     cli_main()
 
-            # CLI --print snapshot with sorting
-            with patch.object(sys, "argv", ["stk", "--print", "--sim", "--sort", "change_pct", "--asc"]):
-                with patch("sys.stdout", new_callable=io.StringIO):
-                    cli_main()
-
-            # CLI --watch mock
-            with patch("term_stock_table.cli.Live") as mock_live_cls:
-                mock_instance = MagicMock()
-                mock_live_cls.return_value.__enter__.return_value = mock_instance
-                with patch("term_stock_table.cli.time.sleep", side_effect=KeyboardInterrupt), \
-                     patch("time.sleep", side_effect=KeyboardInterrupt):
-                    with patch.object(sys, "argv", ["stk", "--watch", "--sim", "--interval", "0.1"]):
-                        with patch("sys.stdout", new_callable=io.StringIO):
-                            cli_main()
-
 
 def test_tui_app_actions():
     from term_stock_table.tui import StockTerminalApp, NoteModal, AddStockModal, DetailModal

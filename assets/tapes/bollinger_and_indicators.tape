@@ -5,6 +5,6 @@ Set Width 1900
 Set Height 600
 Set Padding 12
 Set Theme "Catppuccin Mocha"
-Type "stk --print --sim --sort pe --theme tokyonight"
+Type "stk --sim --theme tokyonight"
 Enter
 Sleep 4s
