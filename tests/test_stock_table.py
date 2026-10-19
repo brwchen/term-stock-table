@@ -808,3 +808,33 @@ def test_extended_dim56_cli_commands():
 
 
 
+
+
+def test_intraday_series_parsing(monkeypatch):
+    import io
+    import json
+    from term_stock_table import api
+
+    payload = {"data": {"sh600519": {"data": {"data": ["0930 10.0 100 1.0", "0931 10.5 250 2.0"]}}}}
+
+    class FakeResp(io.BytesIO):
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+    monkeypatch.setattr(api.urllib.request, "urlopen", lambda *a, **k: FakeResp(json.dumps(payload).encode()))
+    assert api.fetch_intraday_series("600519") == [(10.0, 100), (10.5, 150)]
+
+
+def test_tracker_default_history_and_curve_keeps_spike():
+    from term_stock_table.api import StockDataTracker
+    from term_stock_table.inline_spark import braille_curve
+
+    tr = StockDataTracker("AAPL")
+    assert len(tr.prices) == 200 and tr.prices[-1] == tr.price
+    data = [100.0] * 200
+    data[100] = 110.0
+    flat = braille_curve([100.0] * 200, 8, 1).plain
+    assert braille_curve(data, 8, 1).plain != flat

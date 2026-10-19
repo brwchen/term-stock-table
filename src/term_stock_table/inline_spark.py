@@ -46,12 +46,19 @@ def braille_curve(
     def level(v: float) -> int:
         return round((v - lo) / span * (ph - 1)) if hi != lo else (ph - 1) // 2
 
-    ys = []
+    n = len(data)
+    spans = []
     for x in range(pw):
-        pos = x * (len(data) - 1) / (pw - 1)
-        i = min(int(pos), len(data) - 2)
-        frac = pos - i
-        ys.append(level(data[i] * (1 - frac) + data[i + 1] * frac))
+        if n > pw:
+            # Envelope of every sample falling in this pixel column keeps spikes visible
+            chunk = data[x * n // pw: max(x * n // pw + 1, (x + 1) * n // pw)]
+            spans.append((level(min(chunk)), level(max(chunk))))
+        else:
+            pos = x * (n - 1) / (pw - 1)
+            i = min(int(pos), n - 2)
+            frac = pos - i
+            y = level(data[i] * (1 - frac) + data[i + 1] * frac)
+            spans.append((y, y))
 
     grid = [[0] * width for _ in range(rows)]
 
@@ -59,9 +66,13 @@ def braille_curve(
         row, dy = divmod(ph - 1 - y, 4)
         grid[row][x // 2] |= _BRAILLE_BITS[dy][x % 2]
 
-    for x, y in enumerate(ys):
-        lo_y = min(y, ys[x - 1]) if x else y
-        hi_y = max(y, ys[x - 1]) if x else y
+    prev_mid = None
+    for x, (y_lo, y_hi) in enumerate(spans):
+        mid = (y_lo + y_hi) // 2
+        lo_y, hi_y = y_lo, y_hi
+        if prev_mid is not None:
+            lo_y, hi_y = min(lo_y, prev_mid), max(hi_y, prev_mid)
+        prev_mid = mid
         for yy in range(lo_y, hi_y + 1):
             plot(x, yy)
         if fill:
@@ -100,7 +111,7 @@ def image_sparklines_supported() -> bool:
 
 @lru_cache(maxsize=512)
 def _image(series: tuple, length: int, palette: str, extra: tuple) -> str:
-    return sparkline(list(series), length=length, mode="iterm2", annotate=False, palette=palette, **dict(extra))
+    return sparkline(list(series), length=length, mode="iterm2", annotate=False, palette=palette, width_px=length * 12, height_px=24, **dict(extra))
 
 
 def smart_spark(

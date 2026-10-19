@@ -1,6 +1,8 @@
 """Real-time market quote fetcher and realistic offline simulator."""
 import math
+import json
 import random
+import threading
 import time
 import urllib.request
 from collections import deque
@@ -123,10 +125,36 @@ def fetch_live_quotes(symbols: List[str], timeout: float = 2.0) -> Dict[str, Dic
     return results
 
 
+def fetch_intraday_series(symbol: str, timeout: float = 4.0) -> List[Tuple[float, int]]:
+    """Fetch today's 1-minute (price, per-minute volume) series from Tencent; [] if unavailable."""
+    code = normalize_symbol_code(symbol)
+    url = f"https://web.ifzq.gtimg.cn/appstock/app/minute/query?code={code}"
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (term-stock-table)"})
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            payload = json.loads(resp.read().decode("utf-8", errors="ignore"))
+        rows = next(iter(payload["data"].values()))["data"]["data"]
+    except Exception:
+        return []
+    series: List[Tuple[float, int]] = []
+    prev_cum = 0
+    for row in rows:
+        parts = row.split()
+        if len(parts) < 3:
+            continue
+        try:
+            price, cum = float(parts[1]), int(float(parts[2]))
+        except ValueError:
+            continue
+        series.append((price, max(0, cum - prev_cum)))
+        prev_cum = cum
+    return series
+
+
 class StockDataTracker:
     """Tracks historical series, intraday ticks, indicators, and live quotes."""
 
-    def __init__(self, symbol: str, history_len: int = 30):
+    def __init__(self, symbol: str, history_len: int = 200):
         self.symbol = symbol.strip().upper()
         self.history_len = history_len
         self.prices: deque = deque(maxlen=history_len)
@@ -166,18 +194,43 @@ class StockDataTracker:
         self.asks: List[Tuple[float, int]] = []
         self.is_real = False
 
-        # Seed rolling history
-        p = self.price
-        v = self.volume
+        # Seed rolling history as a minute-like random walk that ends at the quoted price
+        end_price, walk, p = self.price, [], self.price
         for _ in range(history_len):
-            p += (random.random() - 0.48) * (p * 0.006)
-            p = max(0.01, p)
-            v = max(100, int(v * (1.0 + (random.random() - 0.5) * 0.1)))
+            p = max(0.01, p + (random.random() - 0.5) * (p * 0.0015))
+            walk.append(p)
+        shift = end_price - walk[-1]
+        v = max(100, int(self.volume / max(1, history_len)))
+        for p in walk:
+            p = max(0.01, p + shift)
+            v = max(100, int(v * (1.0 + (random.random() - 0.5) * 0.3)))
             self.prices.append(p)
             self.volumes.append(v)
-            self.highs.append(p * 1.002)
-            self.lows.append(p * 0.998)
+            self.highs.append(p * 1.0005)
+            self.lows.append(p * 0.9995)
         self.price = self.prices[-1]
+        self.minute_mode = False
+        self._backfill_started = False
+        self._bucket = 0
+        self._cum_volume = 0
+
+    def _backfill_intraday(self) -> None:
+        series = fetch_intraday_series(self.symbol)
+        if len(series) < 2:
+            return
+        series = series[-self.history_len:]
+        self.prices.clear()
+        self.volumes.clear()
+        self.highs.clear()
+        self.lows.clear()
+        for price, vol in series:
+            self.prices.append(price)
+            self.volumes.append(vol)
+            self.highs.append(price)
+            self.lows.append(price)
+        self._bucket = int(time.time() // 60)
+        self._cum_volume = self.volume
+        self.minute_mode = True
 
     def update_from_quote(self, quote: Dict[str, Any]):
         """Update tracker state with real live market quote."""
@@ -197,7 +250,27 @@ class StockDataTracker:
             self.bids = quote["bids"]
         if quote.get("asks"):
             self.asks = quote["asks"]
+        first_quote = not self.is_real
         self.is_real = True
+
+        if first_quote and not self._backfill_started:
+            self._backfill_started = True
+            threading.Thread(target=self._backfill_intraday, daemon=True).start()
+
+        if self.minute_mode:
+            bucket = int(time.time() // 60)
+            if bucket != self._bucket:
+                self._bucket = bucket
+                self.prices.append(self.price)
+                self.volumes.append(max(0, self.volume - self._cum_volume))
+                self.highs.append(self.price)
+                self.lows.append(self.price)
+                self._cum_volume = self.volume
+            elif self.prices:
+                self.prices[-1] = self.price
+                self.highs[-1] = max(self.highs[-1], self.price)
+                self.lows[-1] = min(self.lows[-1], self.price)
+            return
 
         self.prices.append(self.price)
         self.volumes.append(self.volume)
