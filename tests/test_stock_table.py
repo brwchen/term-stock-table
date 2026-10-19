@@ -526,3 +526,175 @@ def test_tui_app_actions():
     detail_modal = DetailModal(app.trackers[0], palette="cn")
     assert detail_modal.tracker.symbol == "600519"
 
+
+def test_radar_and_anomaly():
+    from term_stock_table.radar import MarketRadarTracker, MarketSentiment, AnomalyEvent
+
+    radar = MarketRadarTracker(palette="cn")
+    panel = radar.get_sentiment_panel()
+    assert panel is not None
+
+    tbl = radar.get_anomaly_table()
+    assert tbl is not None
+
+    full_view = radar.render_full_radar_view()
+    assert full_view is not None
+
+    ev = AnomalyEvent("14:30:00", "300750", "宁德时代", "🚀 火箭发射", 258.4, +4.82, 3850, "急拉")
+    txt_cn = ev.to_colored_text("cn")
+    txt_us = ev.to_colored_text("us")
+    assert "300750" in txt_cn.plain
+    assert "300750" in txt_us.plain
+
+
+def test_intraday_chips_and_tape():
+    from term_stock_table.tick import IntradayChartRenderer, ChipProfileRenderer, TickTapeRenderer
+
+    # Intraday
+    intra = IntradayChartRenderer("600519", "贵州茅台", 1680.0, palette="cn")
+    panel = intra.render_intraday_panel()
+    assert panel is not None
+
+    # Chips
+    chip = ChipProfileRenderer(1688.0, palette="cn")
+    c_panel = chip.render_chip_panel()
+    assert c_panel is not None
+    assert 0 <= chip.chip_data.profit_ratio <= 100
+
+    # Tape
+    tape = TickTapeRenderer(1688.0, palette="cn")
+    t_table = tape.render_tape_table()
+    assert t_table is not None
+    assert len(tape.ticks) > 0
+
+
+def test_sector_heatmap():
+    from term_stock_table.sector import SectorHeatmapTracker
+
+    sec = SectorHeatmapTracker(palette="cn")
+    matrix = sec.render_heatmap_matrix()
+    assert matrix is not None
+
+    tbl = sec.render_sector_table()
+    assert tbl is not None
+
+    full = sec.render_full_sector_view()
+    assert full is not None
+
+
+def test_fundamentals_and_dragon_tiger():
+    from term_stock_table.fundamentals import FundamentalAnalyzer
+
+    fa = FundamentalAnalyzer("600519", "贵州茅台", palette="cn")
+    d_panel = fa.render_dupont_panel()
+    assert d_panel is not None
+
+    dt_tbl = fa.render_dragon_tiger_table()
+    assert dt_tbl is not None
+    assert len(fa.seats) > 0
+
+
+def test_strategy_backtester():
+    from term_stock_table.backtest import StrategyBacktester
+
+    bt = StrategyBacktester("300750", "宁德时代", palette="cn")
+    res = bt.run_sma_cross_strategy(fast_period=5, slow_period=20)
+    assert res.total_trades >= 0
+    assert len(res.strategy_curve) > 0
+
+    panel = bt.render_backtest_panel(res)
+    assert panel is not None
+
+
+def test_webhook_dispatcher():
+    from term_stock_table.webhook import WebhookDispatcher, WebhookConfig
+
+    cfg = WebhookConfig(channel_type="feishu", url="https://open.feishu.cn/mock", enabled=True)
+    dispatcher = WebhookDispatcher(cfg)
+
+    preview = dispatcher.render_test_preview("突破告警", "宁德时代突破255")
+    assert preview is not None
+
+    # Test disabled/empty send
+    d_empty = WebhookDispatcher(WebhookConfig())
+    assert d_empty.send_alert_message("title", "content") is False
+
+
+def test_portfolio_importer_exporter():
+    from term_stock_table.importer import PortfolioDataImporter
+    from term_stock_table.portfolio import Position
+
+    sample_csv = "symbol,name,shares,cost_price,notes\n600519,贵州茅台,100,1420.50,核心持仓\n300750,宁德时代,300,240.00,新能源"
+    positions = PortfolioDataImporter.import_from_csv(sample_csv)
+    assert len(positions) == 2
+    assert positions[0].symbol == "600519"
+    assert positions[0].shares == 100
+    assert positions[0].cost_price == 1420.50
+
+    exported_csv = PortfolioDataImporter.export_to_csv(positions)
+    assert "600519" in exported_csv
+
+    exported_md = PortfolioDataImporter.export_to_markdown(positions)
+    assert "贵州茅台" in exported_md
+
+
+def test_statusline_formatter():
+    from term_stock_table.statusline import StatuslineFormatter
+
+    tracker = StockDataTracker("600519")
+    fmt = StatuslineFormatter(tracker, palette="cn")
+
+    ansi_line = fmt.format_statusline(["600519"], use_ansi=True)
+    assert "贵州茅台" in ansi_line
+    assert "\033[" in ansi_line
+
+    plain_line = fmt.format_statusline(["600519"], use_ansi=False)
+    assert "贵州茅台" in plain_line
+    assert "\033[" not in plain_line
+
+
+def test_extended_cli_and_boss():
+    from term_stock_table.boss import render_neovim_buffer, render_gdb_debugger
+
+    assert render_neovim_buffer() is not None
+    assert render_gdb_debugger() is not None
+
+    # Test extended CLI flags
+    with patch.object(sys, "argv", ["stk", "--radar"]):
+        with patch("sys.stdout", new_callable=io.StringIO):
+            cli_main()
+
+    with patch.object(sys, "argv", ["stk", "--sector"]):
+        with patch("sys.stdout", new_callable=io.StringIO):
+            cli_main()
+
+    with patch.object(sys, "argv", ["stk", "--intraday", "600519"]):
+        with patch("sys.stdout", new_callable=io.StringIO):
+            cli_main()
+
+    with patch.object(sys, "argv", ["stk", "--chips", "600519"]):
+        with patch("sys.stdout", new_callable=io.StringIO):
+            cli_main()
+
+    with patch.object(sys, "argv", ["stk", "--tape", "600519"]):
+        with patch("sys.stdout", new_callable=io.StringIO):
+            cli_main()
+
+    with patch.object(sys, "argv", ["stk", "--dupont", "600519"]):
+        with patch("sys.stdout", new_callable=io.StringIO):
+            cli_main()
+
+    with patch.object(sys, "argv", ["stk", "--backtest", "300750"]):
+        with patch("sys.stdout", new_callable=io.StringIO):
+            cli_main()
+
+    with patch.object(sys, "argv", ["stk", "--statusline"]):
+        with patch("sys.stdout", new_callable=io.StringIO) as mock_out:
+            cli_main()
+            assert len(mock_out.getvalue()) > 0
+
+    with patch.object(sys, "argv", ["stk", "--webhook-test"]):
+        with patch("sys.stdout", new_callable=io.StringIO):
+            cli_main()
+
+

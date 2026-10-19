@@ -23,9 +23,17 @@ from .config import (
 from .table import create_stock_table
 from .detail import render_stock_detail
 from .boss import render_boss_view, PROFILES, export_daily_review
-from .portfolio import calculate_portfolio_pnl, create_portfolio_table
+from .portfolio import calculate_portfolio_pnl, create_portfolio_table, Position
 from .alerts import evaluate_alerts
 from .market import render_indices_banner
+from .radar import MarketRadarTracker
+from .tick import IntradayChartRenderer, ChipProfileRenderer, TickTapeRenderer
+from .sector import SectorHeatmapTracker
+from .fundamentals import FundamentalAnalyzer
+from .backtest import StrategyBacktester
+from .statusline import StatuslineFormatter
+from .importer import PortfolioDataImporter
+from .webhook import WebhookDispatcher, WebhookConfig
 from .tui import StockTerminalApp
 
 
@@ -87,6 +95,69 @@ def main():
         "--indices",
         action="store_true",
         help="Display global major indices overview banner"
+    )
+    parser.add_argument(
+        "--radar", "-r",
+        action="store_true",
+        help="Display market breadth sentiment & live anomaly radar"
+    )
+    parser.add_argument(
+        "--sector",
+        action="store_true",
+        help="Display industry & concept sector heatmap and inflow rankings"
+    )
+    parser.add_argument(
+        "--intraday",
+        type=str,
+        metavar="SYMBOL",
+        help="Display intraday price chart with VWAP line and time axis"
+    )
+    parser.add_argument(
+        "--chips",
+        type=str,
+        metavar="SYMBOL",
+        help="Display chip cost volume profile and profit ratio"
+    )
+    parser.add_argument(
+        "--tape",
+        type=str,
+        metavar="SYMBOL",
+        help="Display real-time tick-by-tick trade tape"
+    )
+    parser.add_argument(
+        "--dupont",
+        type=str,
+        metavar="SYMBOL",
+        help="Display DuPont financial analysis and Dragon-Tiger seat dynamics"
+    )
+    parser.add_argument(
+        "--backtest",
+        type=str,
+        metavar="SYMBOL",
+        help="Run quantitative strategy backtest and render terminal equity curve"
+    )
+    parser.add_argument(
+        "--statusline", "--tmux",
+        action="store_true",
+        help="Output single-line compact ticker for Tmux/WezTerm status bar"
+    )
+    parser.add_argument(
+        "--import-csv",
+        type=str,
+        metavar="FILEPATH",
+        help="Import portfolio position records from CSV file"
+    )
+    parser.add_argument(
+        "--export-csv",
+        nargs="?",
+        const="portfolio_export.csv",
+        metavar="FILEPATH",
+        help="Export current portfolio positions to CSV file"
+    )
+    parser.add_argument(
+        "--webhook-test",
+        action="store_true",
+        help="Test dispatching a sample alert notification via Webhook"
     )
     parser.add_argument(
         "--portfolio",
@@ -180,10 +251,88 @@ def main():
     args = parser.parse_args()
     console = Console()
 
-    # 1. Indices Banner
+    # 1. Indices Banner & Radar & Sector
     if args.indices:
         banner = render_indices_banner(palette=args.palette)
         console.print(banner)
+        return
+
+    if args.radar:
+        radar = MarketRadarTracker(palette=args.palette)
+        console.print(radar.render_full_radar_view())
+        return
+
+    if args.sector:
+        sec = SectorHeatmapTracker(palette=args.palette)
+        console.print(sec.render_full_sector_view())
+        return
+
+    if args.intraday:
+        tr = StockDataTracker(args.intraday)
+        renderer = IntradayChartRenderer(tr.symbol, tr.name, tr.prev_close, palette=args.palette)
+        console.print(renderer.render_intraday_panel())
+        return
+
+    if args.chips:
+        tr = StockDataTracker(args.chips)
+        chip_rend = ChipProfileRenderer(tr.price, palette=args.palette)
+        console.print(chip_rend.render_chip_panel())
+        return
+
+    if args.tape:
+        tr = StockDataTracker(args.tape)
+        tape_rend = TickTapeRenderer(tr.price, palette=args.palette)
+        console.print(tape_rend.render_tape_table())
+        return
+
+    if args.dupont:
+        tr = StockDataTracker(args.dupont)
+        fa = FundamentalAnalyzer(tr.symbol, tr.name, palette=args.palette)
+        console.print(fa.render_dupont_panel())
+        console.print("")
+        console.print(fa.render_dragon_tiger_table())
+        return
+
+    if args.backtest:
+        tr = StockDataTracker(args.backtest)
+        bt = StrategyBacktester(tr.symbol, tr.name, palette=args.palette)
+        console.print(bt.render_backtest_panel())
+        return
+
+    if args.import_csv:
+        imported = PortfolioDataImporter.import_from_csv(args.import_csv)
+        for pos in imported:
+            save_position(pos.symbol, pos.shares, pos.cost_price, notes=pos.notes)
+        console.print(f"[bold green]✓ Imported {len(imported)} positions from {args.import_csv}[/]")
+        return
+
+    if args.export_csv:
+        port = load_portfolio()
+        positions = [
+            Position(sym, sym, data.get("shares", 0), data.get("cost", 0.0), notes=data.get("notes", ""))
+            for sym, data in port.items()
+        ]
+        csv_str = PortfolioDataImporter.export_to_csv(positions)
+        with open(args.export_csv, "w", encoding="utf-8") as f:
+            f.write(csv_str)
+        console.print(f"[bold green]✓ Exported {len(positions)} positions to {args.export_csv}[/]")
+        return
+
+    if args.webhook_test:
+        dispatcher = WebhookDispatcher()
+        preview = dispatcher.render_test_preview(
+            "宁德时代 (300750) 突破预警",
+            "现价 258.40 (+4.82%) 突破目标阻力价位 255.00，量比放大 2.4倍！"
+        )
+        console.print(preview)
+        return
+
+    if args.statusline:
+        symbols_list = args.symbols.split(",") if args.symbols else load_watchlist()
+        trackers_list = [StockDataTracker(s) for s in symbols_list]
+        fmt = StatuslineFormatter(trackers_list, palette=args.palette)
+        line = fmt.format_statusline(symbols_list, use_ansi=True)
+        print(line)
         return
 
     # 2. Watchlist operations

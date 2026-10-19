@@ -32,10 +32,30 @@ Built on top of [`term-sparkline`](https://github.com/brwchen/term-sparkline) fo
   - Automatic non-blocking macOS Notification Center alerts and visual table badges (`🚨`).
 - **Persistent Investment Journal & Strategy Notes**:
   - Record target prices, stop-loss levels, and trade rationales directly from terminal (stored locally in `~/.term_stock/notes.json`).
+- **Market Sentiment & Live Anomaly Radar (全市场情绪与异动雷达)**:
+  - Market breadth meter (Up/Down ratio, Limit-up/Limit-down count, 2-market turnover and volume comparison).
+  - Northbound / Southbound (沪深港通) net flow and intraday curve.
+  - Live anomaly scanner (`🚀 火箭发射`, `💰 大单买入`, `⚡ 封涨停`, `⚠️ 炸板`).
+- **Sector Heatmap & Industry Ranking (行业与概念板块热力图)**:
+  - Unicode block heatmap matrix with dynamic heat intensity and net inflow rankings (`stk --sector`).
+- **Intraday Chart & Chip Volume Distribution (分时走势与筹码分布)**:
+  - High-definition intraday price curve with VWAP average line and time axis (`stk --intraday 600519`).
+  - Cost volume profile histogram with profit ratio (%) and 90% concentration range (`stk --chips 600519`).
+  - Real-time tick tape trade order flow with active Buy/Sell markers (`stk --tape 600519`).
+- **DuPont Analysis & Strategy Backtesting (杜邦财报与量化回测)**:
+  - DuPont identity breakdown (ROE, Net Profit Margin, Asset Turnover, Financial Leverage) (`stk --dupont 600519`).
+  - Fast/Slow SMA crossover and trend backtester with terminal equity curve comparison (`stk --backtest 300750`).
+- **Multi-channel Webhooks & Data Importer (多端机器人预警与数据导入)**:
+  - Multi-endpoint alerts: Feishu / DingTalk / WeCom / Slack / Telegram / Webhook (`stk --webhook-test`).
+  - Two-way CSV portfolio position import/export (`stk --import-csv` / `stk --export-csv`).
+- **Tmux & WezTerm Statusline Component (极客状态栏小组件)**:
+  - Single-line compact ticker string for terminal status bars (`stk --statusline`).
 - **Stealth Boss Mode (摸鱼神器 / Boss Key)**:
   - Press <kbd>b</kbd> or <kbd>ESC</kbd> to instantly camouflage into real-time system monitoring or developer logs:
     - **DevOps Profile**: Linux `top` / `htop` dynamic process table.
     - **Kubernetes Profile**: `kubectl get pods -A` cluster status.
+    - **Neovim Profile**: Asynchronous Rust/Python distributed system buffer.
+    - **GDB Profile**: Interactive debugger breakpoint session.
     - **C++ Build Profile**: CMake / Ninja compilation stream (`[ 82%] Building CXX object...`).
     - **Git Diff Profile**: Code review and diff viewer.
     - **PyTorch ML Profile**: Deep learning training epoch loss loop.
@@ -129,9 +149,12 @@ stk --boss --boss-profile cpp
 | Key | Action | Description |
 |:---:|:---|:---|
 | <kbd>b</kbd> / <kbd>ESC</kbd> | **Boss Key (摸鱼模式)** | Instantly toggles camouflage profile |
-| <kbd>Tab</kbd> | **Next Boss Profile** | Cycles camouflage disguise (DevOps → K8s → C++ → Git → PyTorch → Nginx → Mono) |
+| <kbd>Tab</kbd> | **Next Boss Profile** | Cycles camouflage disguise (DevOps → K8s → Neovim → GDB → C++ → Git → PyTorch → Nginx → Mono) |
 | <kbd>Enter</kbd> | **Stock Detail View** | Opens deep detail page (OHLC, Indicators, 5-Level Depth, Capital Flow, Notes) |
 | <kbd>k</kbd> | **Toggle K-Line** | In detail view, toggle between Multi-period Candlestick & Sparklines |
+| <kbd>R</kbd> | **Market Radar** | Opens Market Breadth sentiment, Northbound flow & live anomaly scanner |
+| <kbd>S</kbd> | **Sector Heatmap** | Opens Industry & Concept heatmap matrix and inflow rankings |
+| <kbd>B</kbd> | **Strategy Backtest** | Runs quantitative SMA strategy backtest with equity curve |
 | <kbd>P</kbd> | **Portfolio View** | Toggle between Watchlist Mode and Portfolio Asset Holdings Mode |
 | <kbd>s</kbd> | **Sort Column** | Cycle sort column (`change_pct`, `price`, `volume`, `amount`, `pe`) |
 | <kbd>r</kbd> | **Reverse Order** | Toggle between Descending (▼) and Ascending (▲) sorting |
@@ -170,7 +193,31 @@ stk --boss --boss-profile cpp
 
 ---
 
-### 4. Stock Detail View, Candlesticks & 5-Level Order Book
+### 4. Market Sentiment & Anomaly Radar
+> Real-time market breadth score, Up/Down ratio, Northbound/Southbound capital flow sparklines, and rocket surge / dump anomaly log.
+<p align="center">
+  <img src="assets/features/radar_and_anomalies.gif" alt="Market Sentiment and Anomaly Radar" width="680"/>
+</p>
+
+---
+
+### 5. Sector & Concept Heatmap Matrix
+> Graphical matrix heatmap of industry sectors with dynamic color heat intensities, net capital inflows, and top leading stocks.
+<p align="center">
+  <img src="assets/features/sector_heatmap_matrix.gif" alt="Sector Heatmap Matrix" width="680"/>
+</p>
+
+---
+
+### 6. Intraday VWAP, Volume Profile & Tick Tape
+> Intraday dual-line price vs VWAP chart, multi-peak cost volume chip distribution, and active Buy/Sell tick order tape.
+<p align="center">
+  <img src="assets/features/intraday_and_chips.gif" alt="Intraday VWAP and Chip Profile" width="680"/>
+</p>
+
+---
+
+### 7. Stock Detail View, Candlesticks & 5-Level Order Book
 > Multi-panel stock analysis workstation with intraday Price+Volume combo curves, ASCII Candlesticks, MA/MACD/KDJ/RSI indicators, Capital Flow, and Bid/Ask depth.
 <p align="center">
   <img src="assets/features/stock_detail_view.gif" alt="Stock Detail View" width="680"/>
@@ -195,6 +242,14 @@ stk --boss --boss-profile cpp
 | `alerts.py` | Smart Alerts | Price target detection, threshold evaluation, and macOS desktop notifications |
 | `indicators.py` | Quant Analytics | Bollinger Bands, SMA, RSI, MACD, KDJ, Candlesticks, and valuation percentiles |
 | `market.py` | Macro & Flow | Major indices banner and multi-tier capital flow simulation |
+| `radar.py` | Radar & Sentiment | Market breadth sentiment meter, Northbound connect flow & live anomaly scanner |
+| `tick.py` | Intraday & Chips | Intraday chart with VWAP line, chip cost volume profile & tick tape |
+| `sector.py` | Sector Heatmap | Industry sector matrix heatmap and leading stock breakdown |
+| `fundamentals.py` | Financials | DuPont identity breakdown, health ratios & Dragon-Tiger seat dynamics |
+| `backtest.py` | Quant Backtest | Moving Average & MACD strategy backtester with terminal equity curves |
+| `webhook.py` | Integrations | Multi-channel Webhook alert dispatcher (Feishu/DingTalk/WeCom/Slack/TG) |
+| `importer.py` | Data Pipeline | Two-way CSV portfolio position import and export |
+| `statusline.py` | Geek Tools | Ultra-compact single-line status ticker for Tmux and WezTerm |
 | `config.py` | Storage | Persistent Watchlist, Portfolio, Alerts, Notes, and Settings in `~/.term_stock/` |
 | `table.py` | UI Engine | Professional Rich Table generator with customizable columns, sorting & sparklines |
 | `detail.py` | Detail View | Multi-panel stock detail layout (Combo chart, 5-level order book, Capital flow, Notes) |

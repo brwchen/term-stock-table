@@ -12,6 +12,11 @@ from term_stock_table.portfolio import calculate_portfolio_pnl, create_portfolio
 from term_stock_table.detail import render_stock_detail
 from term_stock_table.boss import render_boss_view, PROFILES
 from term_stock_table.market import render_indices_banner
+from term_stock_table.radar import MarketRadarTracker
+from term_stock_table.sector import SectorHeatmapTracker
+from term_stock_table.tick import IntradayChartRenderer, ChipProfileRenderer, TickTapeRenderer
+from term_stock_table.fundamentals import FundamentalAnalyzer
+from term_stock_table.backtest import StrategyBacktester
 
 ASSETS_DIR = Path("/Users/xchen17/term-stock-table/assets")
 FEATURES_DIR = ASSETS_DIR / "features"
@@ -169,30 +174,79 @@ def generate_all_gifs():
         loop=0,
     )
 
-    # 6. Main Terminal Demo GIF (Combining Workstation features)
+    # 6. Market Radar & Live Anomaly GIF
+    print("Generating radar_and_anomalies.gif...")
+    radar_frames = []
+    radar = MarketRadarTracker(palette="cn")
+    for _ in range(5):
+        radar_frames.append(renderable_to_image(radar.render_full_radar_view(), width_chars=110))
+    radar_frames[0].save(
+        FEATURES_DIR / "radar_and_anomalies.gif",
+        save_all=True,
+        append_images=radar_frames[1:],
+        duration=500,
+        loop=0,
+    )
+
+    # 7. Sector Heatmap & Inflow Matrix GIF
+    print("Generating sector_heatmap_matrix.gif...")
+    sec_frames = []
+    sec = SectorHeatmapTracker(palette="cn")
+    for _ in range(5):
+        sec_frames.append(renderable_to_image(sec.render_full_sector_view(), width_chars=110))
+    sec_frames[0].save(
+        FEATURES_DIR / "sector_heatmap_matrix.gif",
+        save_all=True,
+        append_images=sec_frames[1:],
+        duration=500,
+        loop=0,
+    )
+
+    # 8. Intraday VWAP & Chip Distribution GIF
+    print("Generating intraday_and_chips.gif...")
+    intra_frames = []
+    intra = IntradayChartRenderer("600519", "贵州茅台", 1680.0, palette="cn")
+    chip = ChipProfileRenderer(1688.0, palette="cn")
+    tape = TickTapeRenderer(1688.0, palette="cn")
+    intra_frames.append(renderable_to_image(intra.render_intraday_panel(), width_chars=110))
+    intra_frames.append(renderable_to_image(intra.render_intraday_panel(), width_chars=110))
+    intra_frames.append(renderable_to_image(chip.render_chip_panel(), width_chars=110))
+    intra_frames.append(renderable_to_image(tape.render_tape_table(), width_chars=110))
+    intra_frames[0].save(
+        FEATURES_DIR / "intraday_and_chips.gif",
+        save_all=True,
+        append_images=intra_frames[1:],
+        duration=600,
+        loop=0,
+    )
+
+    # 9. Main Terminal Demo GIF
     print("Generating demo.gif...")
     demo_frames = []
     # Scene A: Watchlist
-    for _ in range(4):
+    for _ in range(3):
         for tr in trackers:
             tr.tick_simulation()
         demo_frames.append(renderable_to_image(create_stock_table(trackers, palette="cn")))
-    # Scene B: Portfolio
+    # Scene B: Radar & Sentiment
+    demo_frames.append(renderable_to_image(radar.render_full_radar_view(), width_chars=110))
+    # Scene C: Sector Heatmap
+    demo_frames.append(renderable_to_image(sec.render_full_sector_view(), width_chars=110))
+    # Scene D: Portfolio
     p_data = calculate_portfolio_pnl([tr.to_dict() for tr in trackers], portfolio)
     demo_frames.append(renderable_to_image(create_portfolio_table(p_data, palette="cn")))
-    demo_frames.append(renderable_to_image(create_portfolio_table(p_data, palette="cn")))
-    # Scene C: Stock Detail
+    # Scene E: Stock Detail & Candlestick
     demo_frames.append(renderable_to_image(render_stock_detail(trackers[0], palette="cn", show_candlestick=False), width_chars=110))
     demo_frames.append(renderable_to_image(render_stock_detail(trackers[0], palette="cn", show_candlestick=True), width_chars=110))
-    # Scene D: Boss Mode
-    demo_frames.append(renderable_to_image(render_boss_view("devops")))
+    # Scene F: Boss Mode Camouflage
+    demo_frames.append(renderable_to_image(render_boss_view("neovim")))
     demo_frames.append(renderable_to_image(render_boss_view("cpp")))
     
     demo_frames[0].save(
         ASSETS_DIR / "demo.gif",
         save_all=True,
         append_images=demo_frames[1:],
-        duration=500,
+        duration=550,
         loop=0,
     )
     print("All GIFs generated successfully!")

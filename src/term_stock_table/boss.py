@@ -7,7 +7,7 @@ from rich.panel import Panel
 from rich.text import Text
 from rich.box import SIMPLE, SQUARE, ROUNDED
 
-PROFILES = ["devops", "kubectl", "nginx", "cpp", "git", "python", "monochrome"]
+PROFILES = ["devops", "kubectl", "nginx", "cpp", "git", "python", "neovim", "gdb", "monochrome"]
 
 
 def render_devops_top() -> Table:
@@ -250,6 +250,96 @@ def render_python_train() -> Panel:
     )
 
 
+def render_neovim_buffer() -> Panel:
+    """Disguise as Neovim editing asynchronous distributed consensus code."""
+    text = Text()
+    lines = [
+        "  1 │ use tokio::sync::{mpsc, RwLock};",
+        "  2 │ use std::sync::Arc;",
+        "  3 │ ",
+        "  4 │ pub struct RaftEngine<State> {",
+        "  5 │     node_id: u64,",
+        "  6 │     current_term: Arc<RwLock<u64>>,",
+        "  7 │     voted_for: Option<u64>,",
+        "  8 │     log_entries: Vec<LogEntry<State>>,",
+        "  9 │     tx_heartbeat: mpsc::Sender<HeartbeatPacket>,",
+        " 10 │ }",
+        " 11 │ ",
+        " 12 │ impl<State: Clone + Send + Sync> RaftEngine<State> {",
+        " 13 │     pub async fn append_entries(&mut self, term: u64, leader_id: u64) -> Result<bool, RaftError> {",
+        " 14 │         let mut cur_term = self.current_term.write().await;",
+        " 15 │         if term > *cur_term {",
+        " 16 │             *cur_term = term;",
+        " 17 │             self.voted_for = Some(leader_id);",
+        " 18 │             return Ok(true);",
+        " 19 │         }",
+        " 20 │         Ok(false)",
+        " 21 │     }",
+        " 22 │ }",
+        " ~  │ ",
+        " NORMAL  src/consensus/raft.rs  utf-8  88%  16:24  rust-analyzer: ok",
+    ]
+    for l in lines:
+        if "NORMAL" in l:
+            text.append(l + "\n", style="bold black on bright_cyan")
+        elif "pub" in l or "async" in l or "fn" in l or "impl" in l or "struct" in l:
+            text.append(l + "\n", style="bold magenta")
+        elif "Result" in l or "Option" in l or "Arc" in l:
+            text.append(l + "\n", style="bold yellow")
+        else:
+            text.append(l + "\n", style="dim white")
+
+    return Panel(
+        text,
+        title="NVIM v0.10.2 - src/consensus/raft.rs [Modified]",
+        title_align="left",
+        box=ROUNDED,
+        style="dim grey70",
+    )
+
+
+def render_gdb_debugger() -> Panel:
+    """Disguise as interactive GDB / LLDB debugger session."""
+    text = Text()
+    lines = [
+        "(gdb) target remote localhost:3333",
+        "Remote debugging using localhost:3333",
+        "0x00007fff842109ab in epoll_wait () from /lib/x86_64-linux-gnu/libc.so.6",
+        "(gdb) break net_core::dispatch_packet",
+        "Breakpoint 1 at 0x55555558e420: file src/net/dispatcher.cpp, line 142.",
+        "(gdb) continue",
+        "Continuing.",
+        "[Switching to Thread 0x7fff7f7fe700 (LWP 48201)]",
+        "Thread 4 \"worker-4\" hit Breakpoint 1, net_core::dispatch_packet (header=0x7fff7f7fddc0, len=1420)",
+        "    at src/net/dispatcher.cpp:142",
+        "142         if (!verify_checksum(header->crc32, header->payload, len)) {",
+        "(gdb) print *header",
+        "$1 = {magic = 0x5a4f5241, version = 2, seq_id = 918402, crc32 = 0x8f2d91ab}",
+        "(gdb) bt 3",
+        "#0  net_core::dispatch_packet (header=0x7fff7f7fddc0, len=1420) at src/net/dispatcher.cpp:142",
+        "#1  0x000055555558f120 in net_core::io_worker_loop (ctx=0x5555557b2010) at src/net/worker.cpp:89",
+        "#2  0x00007fff842016ba in start_thread (arg=0x7fff7f7fe700) at pthread_create.c:481",
+        "(gdb) _",
+    ]
+    for l in lines:
+        if l.startswith("(gdb)"):
+            text.append(l + "\n", style="bold green")
+        elif "Breakpoint" in l or "hit" in l:
+            text.append(l + "\n", style="bold yellow")
+        elif l.startswith("$1") or l.startswith("#"):
+            text.append(l + "\n", style="cyan")
+        else:
+            text.append(l + "\n", style="dim white")
+
+    return Panel(
+        text,
+        title="GNU gdb (Ubuntu 12.1-0ubuntu1~22.04.2) - PID 48198",
+        title_align="left",
+        box=ROUNDED,
+        style="dim grey70",
+    )
+
+
 def render_boss_view(profile: str = "devops", trackers=None):
     """Render selected boss mode camouflage profile."""
     p = profile.lower()
@@ -265,6 +355,10 @@ def render_boss_view(profile: str = "devops", trackers=None):
         return render_git_diff()
     elif p == "python":
         return render_python_train()
+    elif p == "neovim":
+        return render_neovim_buffer()
+    elif p == "gdb":
+        return render_gdb_debugger()
     elif p == "monochrome" and trackers:
         return render_monochrome_table(trackers)
     return render_devops_top()

@@ -1,4 +1,5 @@
 """Portfolio and PnL calculation and rendering engine."""
+from dataclasses import dataclass
 from typing import Dict, List, Any, Optional
 from rich.table import Table
 from rich.panel import Panel
@@ -7,6 +8,17 @@ from rich.box import ROUNDED
 
 from .config import load_portfolio
 from .table import format_amount
+
+
+@dataclass
+class Position:
+    """Holding position."""
+    symbol: str
+    name: str
+    shares: int
+    cost_price: float
+    notes: str = ""
+    currency: str = "CNY"
 
 
 def calculate_portfolio_pnl(quotes: List[Dict[str, Any]], portfolio: Optional[Dict[str, Dict[str, Any]]] = None) -> Dict[str, Any]:

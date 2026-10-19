@@ -28,6 +28,9 @@ from .boss import render_boss_view, PROFILES
 from .portfolio import calculate_portfolio_pnl, create_portfolio_table
 from .alerts import evaluate_alerts
 from .market import render_indices_banner
+from .radar import MarketRadarTracker
+from .sector import SectorHeatmapTracker
+from .backtest import StrategyBacktester
 
 
 class AlertModal(ModalScreen[None]):
@@ -141,6 +144,70 @@ class AddStockModal(ModalScreen[None]):
             self.dismiss()
 
 
+class RadarModal(ModalScreen[None]):
+    """Modal screen for market sentiment and anomaly radar."""
+
+    def __init__(self, palette: str = "cn"):
+        super().__init__()
+        self.palette = palette
+
+    def compose(self) -> ComposeResult:
+        radar = MarketRadarTracker(palette=self.palette)
+        with Vertical(id="detail-container"):
+            yield Static(radar.render_full_radar_view(), id="detail-view")
+            with Horizontal(id="detail-footer"):
+                yield Button("Close (Esc)", id="close-radar-btn", variant="default")
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        self.dismiss()
+
+    def key_escape(self) -> None:
+        self.dismiss()
+
+
+class SectorModal(ModalScreen[None]):
+    """Modal screen for sector heatmap and rankings."""
+
+    def __init__(self, palette: str = "cn"):
+        super().__init__()
+        self.palette = palette
+
+    def compose(self) -> ComposeResult:
+        sec = SectorHeatmapTracker(palette=self.palette)
+        with Vertical(id="detail-container"):
+            yield Static(sec.render_full_sector_view(), id="detail-view")
+            with Horizontal(id="detail-footer"):
+                yield Button("Close (Esc)", id="close-sector-btn", variant="default")
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        self.dismiss()
+
+    def key_escape(self) -> None:
+        self.dismiss()
+
+
+class BacktestModal(ModalScreen[None]):
+    """Modal screen for strategy backtesting."""
+
+    def __init__(self, tracker: StockDataTracker, palette: str = "cn"):
+        super().__init__()
+        self.tracker = tracker
+        self.palette = palette
+
+    def compose(self) -> ComposeResult:
+        bt = StrategyBacktester(self.tracker.symbol, self.tracker.name, palette=self.palette)
+        with Vertical(id="detail-container"):
+            yield Static(bt.render_backtest_panel(), id="detail-view")
+            with Horizontal(id="detail-footer"):
+                yield Button("Close (Esc)", id="close-bt-btn", variant="default")
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        self.dismiss()
+
+    def key_escape(self) -> None:
+        self.dismiss()
+
+
 class DetailModal(ModalScreen[None]):
     """Modal screen for comprehensive stock detail view."""
 
@@ -251,6 +318,9 @@ class StockTerminalApp(App):
         Binding("d", "delete_stock", "Delete Stock"),
         Binding("s", "cycle_sort", "Sort Column"),
         Binding("r", "reverse_sort", "Reverse Sort"),
+        Binding("R", "show_radar", "Market Radar"),
+        Binding("S", "show_sector", "Sector Heatmap"),
+        Binding("B", "show_backtest", "Strategy Backtest"),
         Binding("P", "toggle_portfolio", "Portfolio View"),
         Binding("p", "toggle_palette", "CN/US Palette"),
         Binding("q", "quit", "Quit"),
@@ -430,6 +500,20 @@ class StockTerminalApp(App):
             remove_from_watchlist(tr.symbol)
             self.notify(f"Removed {tr.symbol} from watchlist.")
             self.refresh_trackers_from_disk()
+
+    def action_show_radar(self) -> None:
+        """Open market sentiment and anomaly radar modal."""
+        self.push_screen(RadarModal(palette=self.palette))
+
+    def action_show_sector(self) -> None:
+        """Open sector heatmap and rankings modal."""
+        self.push_screen(SectorModal(palette=self.palette))
+
+    def action_show_backtest(self) -> None:
+        """Open strategy backtest modal for current stock."""
+        if self.trackers:
+            tr = self.trackers[self.selected_index % len(self.trackers)]
+            self.push_screen(BacktestModal(tr, palette=self.palette))
 
     def action_toggle_palette(self) -> None:
         """Toggle between CN (Red Up) and US (Green Up) color palettes."""
