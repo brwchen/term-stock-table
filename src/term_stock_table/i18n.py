@@ -7,6 +7,7 @@ _lang = "en"
 STRINGS: Dict[str, Dict[str, str]] = {
     "en": {
         "app_title": "term-stock-table (Professional Financial Workstation)",
+        "b_stealth": "Stealth View",
         "lang_switched": "Language: English",
         # table
         "col_symbol": "Symbol", "col_name": "Name", "col_price": "Price", "col_change_pct": "Change%",
@@ -70,6 +71,7 @@ STRINGS: Dict[str, Dict[str, str]] = {
     },
     "zh": {
         "app_title": "term-stock-table（专业金融终端）",
+        "b_stealth": "伪装显示",
         "lang_switched": "语言：中文",
         "col_symbol": "代码", "col_name": "名称", "col_price": "现价", "col_change_pct": "涨跌幅",
         "col_change": "涨跌额", "col_amplitude": "振幅", "col_turnover": "换手率", "col_volume": "成交量",

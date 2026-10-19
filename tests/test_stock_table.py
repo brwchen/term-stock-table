@@ -849,3 +849,34 @@ def test_language_switch():
     assert t("n_added", symbol="AAPL").startswith("已添加")
     set_lang("en")
     assert get_lang() == "en"
+
+
+def test_stealth_view_hides_market_identity():
+    import asyncio
+    from term_stock_table.tui import StockTerminalApp
+
+    async def run():
+        app = StockTerminalApp(symbols=["600519", "AAPL"], use_real_data=False)
+        async with app.run_test(size=(110, 40)) as pilot:
+            await pilot.pause(1.0)
+            await pilot.press("m")
+            await pilot.pause(0.4)
+            screen = "\n".join(s.text for s in app.screen._compositor.render_strips())
+            assert "svc-1" in screen and "600519" not in screen and "AAPL" not in screen
+            await pilot.press("enter")
+            await pilot.pause(0.5)
+            screen = "\n".join(s.text for s in app.screen._compositor.render_strips())
+            assert "p99 latency" in screen and "600519" not in screen
+            await pilot.press("escape")
+            await pilot.press("m")
+            assert app.stealth is False
+
+            app.idle_seconds = 0.5
+            app.last_activity -= 5
+            await pilot.pause(1.3)
+            assert app.stealth and app.stealth_auto
+            await pilot.press("down")
+            await pilot.pause(0.3)
+            assert app.stealth is False
+
+    asyncio.run(run())

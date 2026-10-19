@@ -35,6 +35,8 @@ def braille_curve(
     up: Optional[bool] = None,
     lo: Optional[float] = None,
     hi: Optional[float] = None,
+    color: Optional[str] = None,
+    guide: Optional[float] = None,
 ) -> Text:
     """Connected braille line chart: (2*width) x (4*rows) dots, continuous like a smooth curve."""
     data = [float(v) for v in series]
@@ -93,12 +95,20 @@ def braille_curve(
     is_red = up if palette == "cn" else not up
     style = red if is_red else green
     dim_style = dim_red if is_red else dim_green
+    if color:
+        style, dim_style = color, color
+    guide_row = None
+    if guide is not None and lo <= guide <= hi:
+        guide_row = (ph - 1 - level(guide)) // 4
     text = Text()
     for r in range(rows):
         if r:
             text.append("\n")
         for c in range(width):
             line_bits, area_bits = grid[r][c], area[r][c]
+            if guide_row == r and not (line_bits | area_bits):
+                text.append("┄", style="grey35")
+                continue
             ch = chr(0x2800 + (line_bits | area_bits))
             text.append(ch, style=style if line_bits else dim_style)
     return text

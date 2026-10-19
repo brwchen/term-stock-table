@@ -162,6 +162,8 @@ stk --boss --boss-profile cpp
 | <kbd>T</kbd> | **Theme Selector** | Open theme picker (Bloomberg, Tokyo Night, Catppuccin, Cyberpunk, Nord, Gruvbox) |
 | <kbd>F</kbd> | **Custom Formula** | Open safe AST indicator formula expression calculator |
 | <kbd>b</kbd> / <kbd>ESC</kbd> | **Boss Key (摸鱼模式)** | Instantly toggles camouflage profile |
+| <kbd>Ctrl</kbd>+<kbd>B</kbd> | **Boss Key in input dialogs** | Same as <kbd>b</kbd> where typing is active |
+| <kbd>m</kbd> | **Stealth View** | Shows the same data as a gateway log stream and latency charts (stocks become `svc-N`, prices become ms); auto-engages after `stealth_idle` seconds (default 20, `0` disables) of inactivity or when the terminal loses focus, and any key restores |
 | <kbd>Tab</kbd> | **Next Boss Profile** | Cycles camouflage disguise (DevOps → K8s → Neovim → GDB → C++ → Git → PyTorch → Nginx → Mono) |
 | <kbd>Enter</kbd> | **Stock Detail View** | Opens deep detail page (OHLC, Indicators, 5-Level Depth, Capital Flow, Notes) |
 | <kbd>k</kbd> | **Toggle K-Line** | In detail view, toggle between Multi-period Candlestick & Sparklines |
