@@ -344,6 +344,7 @@ class DetailModal(ScrollKeysMixin, ModalScreen[None]):
         self.tracker = tracker
         self.palette = palette
         self.period = "intraday"
+        self.header_expanded = False
         self.kline_cache: Dict[str, List[Dict[str, Any]]] = {}
         self.kline_note: Dict[str, str] = {}
 
@@ -364,7 +365,9 @@ class DetailModal(ScrollKeysMixin, ModalScreen[None]):
 
     def update_content(self) -> None:
         notes = get_symbol_notes(self.tracker.symbol)
-        self.query_one("#detail-header", Static).update(render_detail_header(self.tracker, self.palette))
+        self.query_one("#detail-header", Static).update(
+            render_detail_header(self.tracker, self.palette, self.header_expanded)
+        )
         layout = render_detail_body(
             self.tracker,
             palette=self.palette,
@@ -405,7 +408,19 @@ class DetailModal(ScrollKeysMixin, ModalScreen[None]):
         else:
             self.dismiss()
 
+    def toggle_header(self) -> None:
+        self.header_expanded = not self.header_expanded
+        self.update_content()
+
+    def on_click(self, event) -> None:
+        if getattr(event.widget, "id", None) == "detail-header":
+            self.toggle_header()
+
     def on_key(self, event) -> None:
+        if event.key == "e":
+            self.toggle_header()
+            event.stop()
+            return
         if event.key in {str(i) for i in range(1, len(self.PERIODS) + 1)}:
             self.set_period(self.PERIODS[int(event.key) - 1])
             event.stop()

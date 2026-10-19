@@ -52,6 +52,19 @@ def fmt_amount(value: float) -> str:
     return f"{value:,.0f}"
 
 
+def limit_pct(symbol: str, name: str = "") -> float:
+    """Daily price-limit ratio for mainland A-shares (0 for markets without limits)."""
+    if not (symbol.isdigit() and len(symbol) == 6):
+        return 0.0
+    if "ST" in name.upper():
+        return 0.05
+    if symbol.startswith(("300", "301", "688")):
+        return 0.20
+    if symbol.startswith(("8", "4")):
+        return 0.30
+    return 0.10
+
+
 def minute_label(index: int) -> str:
     """Clock time of the n-th one-minute bar of an A-share session (09:30-11:30, 13:00-15:00)."""
     minutes = 9 * 60 + 30 + index if index < 120 else 13 * 60 + (index - 120)
@@ -70,8 +83,8 @@ def style_for(value: float, ref: float, palette: str) -> str:
 class DetailHeader:
     """Name/code on top, big price on the left, key quote fields in a grid on the right."""
 
-    def __init__(self, tracker: StockDataTracker, palette: str = "cn"):
-        self.tracker, self.palette = tracker, palette
+    def __init__(self, tracker: StockDataTracker, palette: str = "cn", expanded: bool = False):
+        self.tracker, self.palette, self.expanded = tracker, palette, expanded
 
     def __rich_console__(self, console, options):
         tr = self.tracker
@@ -81,6 +94,8 @@ class DetailHeader:
         title = Text()
         title.append(tr.name, style="bold bright_white")
         title.append(f"  {tr.symbol}", style="dim")
+        title.append("   ▴ " if self.expanded else "   ▾ ", style="bold cyan")
+        title.append(t("d_collapse") if self.expanded else t("d_expand"), style="cyan")
 
         price = Text()
         price.append(f"{tr.price:.2f}\n", style=f"bold {style}")
@@ -111,7 +126,39 @@ class DetailHeader:
         outer.add_column(width=max(16, len(price.plain.split("\n")[1]) + 2))
         outer.add_column(justify="right", ratio=1)
         outer.add_row(price, grid)
-        yield Panel(Group(Align.center(title), outer), box=ROUNDED, border_style="cyan", padding=(0, 1))
+        parts = [Align.center(title), outer]
+        if self.expanded:
+            parts.append(Text(t("d_market_data"), style="bold"))
+            parts.append(self.extra_grid())
+        yield Panel(Group(*parts), box=ROUNDED, border_style="cyan", padding=(0, 1))
+
+    def extra_grid(self) -> Table:
+        tr = self.tracker
+        up, down = trend_styles(self.palette)
+        limit = limit_pct(tr.symbol, tr.name)
+        avg = tr.amount / tr.volume if tr.volume else 0.0
+        if not (tr.low * 0.5 < avg < tr.high * 2):
+            prices = list(tr.prices)
+            avg = sum(prices) / len(prices) if prices else tr.price
+        rows = [
+            [("d_limit_up", f"{tr.prev_close * (1 + limit):.2f}" if limit else "-", up),
+             ("d_avg", f"{avg:.2f}", style_for(avg, tr.prev_close, self.palette))],
+            [("d_limit_down", f"{tr.prev_close * (1 - limit):.2f}" if limit else "-", down),
+             ("dh_amp", f"{tr.amplitude:.2f}%", "white")],
+            [("dh_prev", f"{tr.prev_close:.2f}", "white"), ("dh_amt", fmt_amount(tr.amount), "white")],
+            [("d_volume_full", fmt_amount(tr.volume), "white"), ("dh_turn", f"{tr.turnover_rate:.2f}%", "white")],
+            [("dh_pe", f"{tr.pe:.2f}", "white"), ("d_pb", f"{tr.pb:.2f}", "white")],
+        ]
+        grid = Table.grid(expand=True, padding=(0, 2))
+        for _ in range(2):
+            grid.add_column(style="dim", ratio=1)
+            grid.add_column(justify="right", ratio=1)
+        for row in rows:
+            cells = []
+            for key, value, st in row:
+                cells += [t(key), Text(value, style=st)]
+            grid.add_row(*cells)
+        return grid
 
 
 class PriceChart:
@@ -245,8 +292,8 @@ def side_panel(tracker: StockDataTracker, palette: str):
     )
 
 
-def render_detail_header(tracker: StockDataTracker, palette: str = "cn") -> DetailHeader:
-    return DetailHeader(tracker, palette)
+def render_detail_header(tracker: StockDataTracker, palette: str = "cn", expanded: bool = False) -> DetailHeader:
+    return DetailHeader(tracker, palette, expanded)
 
 
 def indicator_text(price_list: List[float], tracker: StockDataTracker) -> Text:
