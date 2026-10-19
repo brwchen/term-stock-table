@@ -128,8 +128,10 @@ def smart_spark(
         return InlineSparkCell(data, length, annotation, palette=palette, **kwargs)
     text = braille_curve(data, length, rows, palette, fill=bool(kwargs.get("fill")))
     if annotation is not None:
-        text.append(" ")
-        text.append_text(annotation)
+        lines = text.split("\n")
+        lines[0].append(" ")
+        lines[0].append_text(annotation)
+        text = Text("\n").join(lines)
     return text
 
 

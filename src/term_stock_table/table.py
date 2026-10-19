@@ -1,10 +1,11 @@
 """Rich table generator for professional terminal stock monitoring."""
+import sys
 from typing import List, Optional, Dict, Any
 from rich.table import Table
 from rich.text import Text
 from rich.box import ROUNDED, HEAVY_EDGE, SIMPLE
 from .api import StockDataTracker
-from .inline_spark import smart_spark
+from .inline_spark import smart_spark, image_sparklines_supported
 from .indicators import compute_bollinger_bands, render_bollinger_badge
 
 
@@ -40,6 +41,7 @@ def create_stock_table(
 ) -> Table:
     """Create a high-density, professional Rich Table for stock monitoring with sorting & alert indicators."""
     is_cn = (palette == "cn")
+    spark_rows = 1 if image_sparklines_supported() and sys.stdout.isatty() else 2
     # Sort trackers if requested
     sorted_trackers = list(trackers)
     if sort_by:
@@ -90,7 +92,7 @@ def create_stock_table(
             # Add sort indicator arrow
             if sort_by == col_key:
                 title += " ▼" if reverse else " ▲"
-            table.add_column(title, justify=justify, style=style, min_width=min_w)
+            table.add_column(title, justify=justify, style=style, min_width=min_w, vertical="middle")
 
     up_count = 0
     down_count = 0
@@ -123,7 +125,7 @@ def create_stock_table(
         if not monochrome and len(price_list) >= 2:
             pct = (price_list[-1] / price_list[0] - 1) * 100 if price_list[0] else 0.0
             note = Text(f"[{price_list[-1]:.2f} {pct:+.2f}%]")
-        spark_text = smart_spark(price_list, 16, palette, note, fill=False, show_dot=False)
+        spark_text = smart_spark(price_list, 20, palette, note, rows=spark_rows, fill=False, show_dot=False)
 
         sym_display = tr.symbol
         if alerts_triggered and tr.symbol in alerts_triggered:
