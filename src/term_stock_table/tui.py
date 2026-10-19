@@ -163,6 +163,8 @@ class AddStockModal(ModalScreen[None]):
 class RadarModal(ModalScreen[None]):
     """Modal screen for market sentiment and anomaly radar."""
 
+    BINDINGS = [Binding("q", "app.quit", "Quit")]
+
     def __init__(self, palette: str = "cn"):
         super().__init__()
         self.palette = palette
@@ -183,6 +185,8 @@ class RadarModal(ModalScreen[None]):
 
 class SectorModal(ModalScreen[None]):
     """Modal screen for sector heatmap and rankings."""
+
+    BINDINGS = [Binding("q", "app.quit", "Quit")]
 
     def __init__(self, palette: str = "cn"):
         super().__init__()
@@ -205,6 +209,8 @@ class SectorModal(ModalScreen[None]):
 class BacktestModal(ModalScreen[None]):
     """Modal screen for strategy backtesting."""
 
+    BINDINGS = [Binding("q", "app.quit", "Quit")]
+
     def __init__(self, tracker: StockDataTracker, palette: str = "cn"):
         super().__init__()
         self.tracker = tracker
@@ -226,6 +232,8 @@ class BacktestModal(ModalScreen[None]):
 
 class ThemeModal(ModalScreen[None]):
     """Modal screen for selecting theme presets."""
+
+    BINDINGS = [Binding("q", "app.quit", "Quit")]
 
     def compose(self) -> ComposeResult:
         with Vertical(id="alert-dialog"):
@@ -251,6 +259,8 @@ class ThemeModal(ModalScreen[None]):
 class FormulaModal(ModalScreen[None]):
     """Modal screen for custom indicator formulas."""
 
+    BINDINGS = [Binding("q", "app.quit", "Quit")]
+
     def compose(self) -> ComposeResult:
         formulas = FormulaManager.load_formulas()
         with Vertical(id="alert-dialog"):
@@ -268,6 +278,8 @@ class FormulaModal(ModalScreen[None]):
 
 class DetailModal(ModalScreen[None]):
     """Modal screen for comprehensive stock detail view with switchable chart periods."""
+
+    BINDINGS = [Binding("q", "app.quit", "Quit")]
 
     PERIODS = ["intraday", "m5", "m15", "m30", "m60", "day", "week", "month"]
 
