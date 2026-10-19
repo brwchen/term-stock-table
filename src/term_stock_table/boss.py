@@ -51,8 +51,10 @@ def render_devops_top(trackers=None, selected_symbol: Optional[str] = None) -> T
     rows = [(float(p[8]), p) for p in fake_procs]
     if trackers:
         rows = [(cpu, p[:11] + (Text(""),) + p[11:]) for cpu, p in rows]
-        rows += [(abs(_change_pct(tr)) * 3 + 0.1, tr) for tr in trackers if tr.prices]
-    rows.sort(key=lambda r: -r[0])
+        rows.sort(key=lambda r: -r[0])
+        rows = [(0, tr) for tr in trackers if tr.prices] + rows
+    else:
+        rows.sort(key=lambda r: -r[0])
     # Stock rows are built in final order so queued trend images map to rows in sequence.
     for _, row in rows:
         table.add_row(*(_stock_process_row(row, selected_symbol) if hasattr(row, "prices") else row))
@@ -380,7 +382,7 @@ def render_gdb_debugger() -> Panel:
     )
 
 
-def render_boss_view(profile: str = "devops", trackers=None):
+def render_boss_view(profile: str = "ops", trackers=None):
     """Render selected boss mode camouflage profile."""
     p = profile.lower()
     if p == "ops" and trackers:

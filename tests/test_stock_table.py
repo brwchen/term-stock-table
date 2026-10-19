@@ -479,13 +479,11 @@ def test_tui_app_actions():
     app = StockTerminalApp(symbols=["600519", "AAPL"], palette="cn", use_real_data=False)
     
     # Test boss mode toggling
-    assert app.stealth is False
+    assert app.is_boss_mode is False
     app.action_toggle_boss()
-    assert app.stealth is True
-    app.action_cycle_boss_profile()
-    assert app.boss_profile_idx == 1
+    assert app.is_boss_mode is True
     app.action_toggle_boss()
-    assert app.stealth is False
+    assert app.is_boss_mode is False
 
     # Test palette toggle
     assert app.palette == "cn"
@@ -851,32 +849,43 @@ def test_language_switch():
     assert get_lang() == "en"
 
 
-def test_stealth_view_hides_market_identity():
+def test_boss_key_single_page_and_idle():
     import asyncio
     from term_stock_table.tui import StockTerminalApp
 
+    def text(app):
+        return "\n".join(s.text for s in app.screen._compositor.render_strips())
+
     async def run():
         app = StockTerminalApp(symbols=["600519", "AAPL"], use_real_data=False)
-        async with app.run_test(size=(110, 40)) as pilot:
+        async with app.run_test(size=(130, 30)) as pilot:
             await pilot.pause(1.0)
             await pilot.press("b")
             await pilot.pause(0.4)
-            screen = "\n".join(s.text for s in app.screen._compositor.render_strips())
-            assert "svc-" in screen and "600519" not in screen and "AAPL" not in screen
-            await pilot.press("enter")
-            await pilot.pause(0.5)
-            screen = "\n".join(s.text for s in app.screen._compositor.render_strips())
-            assert "p99 latency" in screen and "600519" not in screen
-            await pilot.press("escape")
+            screen = text(app)
+            assert "top -" in screen and "600519" not in screen
+            assert screen.index("GZMT") < screen.index("dockerd")
             await pilot.press("b")
-            assert app.stealth is False
+            await pilot.press("enter")
+            await pilot.pause(0.4)
+            await pilot.press("b")
+            await pilot.pause(0.4)
+            screen = text(app)
+            assert "top -" in screen and "600519" not in screen
+            await pilot.press("b")
+            await pilot.press("escape")
 
             app.idle_seconds = 0.5
             app.last_activity -= 5
             await pilot.pause(1.3)
-            assert app.stealth and app.stealth_auto
+            assert app.is_boss_mode and app.boss_auto
             await pilot.press("down")
             await pilot.pause(0.3)
-            assert app.stealth is False
+            assert app.is_boss_mode is False
+
+            await pilot.press("b")
+            app.last_activity -= 5
+            await pilot.pause(1.3)
+            assert app.is_boss_mode and not app.boss_auto
 
     asyncio.run(run())

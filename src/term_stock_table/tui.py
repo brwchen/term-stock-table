@@ -42,8 +42,7 @@ from .inline_spark import (
     _image,
 )
 from rich.cells import cell_len
-from .boss import render_boss_view, PROFILES
-from . import stealth as stealth_mod
+from .boss import render_boss_view
 from .portfolio import calculate_portfolio_pnl, create_portfolio_table
 from .alerts import evaluate_alerts
 from .market import render_indices_banner
@@ -378,32 +377,25 @@ class DetailModal(ScrollKeysMixin, ModalScreen[None]):
         self.update_content()
 
     def update_content(self) -> None:
-        stealth = bool(getattr(self.app, "stealth", False))
         notes = get_symbol_notes(self.tracker.symbol)
         header = self.query_one("#detail-header", Static)
         popup = self.query_one("#detail-popup", Static)
-        if stealth:
-            header.update(stealth_mod.StealthHeader(self.tracker))
-            layout = stealth_mod.StealthBody(self.tracker, self.period, self.kline_cache.get(self.period))
-            popup.display = False
-        else:
-            header.update(render_detail_header(self.tracker, self.palette, self.header_expanded))
-            popup.update(render_detail_popup(self.tracker, self.palette))
-            popup.display = self.header_expanded
-            self.place_popup()
-            layout = render_detail_body(
-                self.tracker,
-                palette=self.palette,
-                notes=notes,
-                period=self.period,
-                candles=self.kline_cache.get(self.period),
-                period_note=self.kline_note.get(self.period, ""),
-            )
+        header.update(render_detail_header(self.tracker, self.palette, self.header_expanded))
+        popup.update(render_detail_popup(self.tracker, self.palette))
+        popup.display = self.header_expanded
+        self.place_popup()
+        layout = render_detail_body(
+            self.tracker,
+            palette=self.palette,
+            notes=notes,
+            period=self.period,
+            candles=self.kline_cache.get(self.period),
+            period_note=self.kline_note.get(self.period, ""),
+        )
         self.query_one("#detail-view", Static).update(layout)
         for i, p in enumerate(self.PERIODS, 1):
             btn = self.query_one(f"#period-{p}", Button)
-            name = stealth_mod.stealth_period_label(p) if stealth else period_label(p)
-            btn.label = f"{name} {i}"
+            btn.label = f"{period_label(p)} {i}"
             btn.set_class(p == self.period, "active")
 
     def set_period(self, period: str) -> None:
@@ -599,7 +591,6 @@ class StockTerminalApp(App):
         Binding("b", "toggle_boss", "Boss Key", priority=True),
         Binding("ctrl+b", "toggle_boss(False)", "Boss Key", show=False, priority=True),
         Binding("escape", "handle_escape", "Escape", priority=True),
-        Binding("tab", "cycle_boss_profile", "Next Boss Disguise"),
         Binding("enter", "show_detail", "Stock Detail"),
         Binding("j", "cursor_down", "Next Row (Vim)", show=False),
         Binding("k", "cursor_up", "Prev Row (Vim)", show=False),
@@ -627,7 +618,7 @@ class StockTerminalApp(App):
 
     BINDING_LABELS = {
         ("b", "toggle_boss"): "b_boss", ("escape", "handle_escape"): "b_escape",
-        ("tab", "cycle_boss_profile"): "b_tab", ("enter", "show_detail"): "b_enter",
+        ("enter", "show_detail"): "b_enter",
         ("n", "add_note"): "b_note", ("l", "set_alert"): "b_alert", ("a", "add_stock"): "b_add",
         ("slash", "add_stock"): "b_search", ("d", "delete_stock"): "b_delete",
         ("s", "cycle_sort"): "b_sort", ("r", "reverse_sort"): "b_reverse",
@@ -663,12 +654,10 @@ class StockTerminalApp(App):
         self.selected_index: int = 0
         self.selected_symbol: Optional[str] = None
         self.is_boss_mode: bool = False
-        self.stealth: bool = False
-        self.stealth_auto: bool = False
+        self.boss_auto: bool = False
         self.last_activity: float = time.monotonic()
-        self.idle_seconds: float = float(load_settings().get("stealth_idle", 20))
+        self.idle_seconds: float = float(load_settings().get("boss_idle", 20))
         self.is_portfolio_mode: bool = False
-        self.boss_profile_idx: int = 0
         self.sort_columns = [None, "change_pct", "price", "volume", "amount", "amplitude", "pe"]
         self.sort_col_idx: int = 0
         self.sort_descending: bool = True
@@ -685,13 +674,13 @@ class StockTerminalApp(App):
         self.apply_language()
         self.update_view()
         self.set_interval(self.refresh_interval, self.refresh_market_data)
-        self.set_interval(1.0, self.stealth_idle_tick)
+        self.set_interval(1.0, self.boss_idle_tick)
         if self.overlay_enabled:
             self.install_overlay_hook()
 
     def apply_language(self) -> None:
         """Retitle the app and footer bindings in the active language."""
-        self.title = "ops-console" if self.stealth else t("app_title")
+        self.title = "ops-console" if self.is_boss_mode else t("app_title")
         for key, bindings in self._bindings.key_to_bindings.items():
             for i, binding in enumerate(bindings):
                 label = self.BINDING_LABELS.get((binding.key, binding.action))
@@ -734,7 +723,7 @@ class StockTerminalApp(App):
 
     def scroll_to_selected(self) -> None:
         """Keep the highlighted row inside the visible viewport."""
-        if self.is_boss_mode or self.is_portfolio_mode or self.stealth:
+        if self.is_boss_mode or self.is_portfolio_mode:
             return
         scroll = self.query_one("#main-scroll")
         if self.selected_index == 0:
@@ -744,7 +733,7 @@ class StockTerminalApp(App):
         scroll.scroll_to_region(Region(0, y, 1, self.row_height), animate=True, duration=0.15, easing="out_cubic")
 
     def overlay_payload(self) -> str:
-        if not self.overlay_items or len(self.screen_stack) > 1:
+        if not self.overlay_items or (len(self.screen_stack) > 1 and not isinstance(self.top_screen(), BossScreen)):
             return ""
         try:
             strips = self.screen._compositor.render_strips()
@@ -752,7 +741,7 @@ class StockTerminalApp(App):
             return ""
         blank = overlay_blank(OVERLAY_BLANK_WIDTH)
         out = ["\x1b7"]
-        idx = 0 if (self.is_boss_mode or self.stealth) else self.hidden_rows_above()
+        idx = 0 if (self.is_boss_mode or isinstance(self.top_screen(), BossScreen)) else self.hidden_rows_above()
         first = idx
         for y, strip in enumerate(strips):
             text = strip.text
@@ -829,16 +818,8 @@ class StockTerminalApp(App):
             return
 
         self.overlay_items = []
-        if self.is_boss_mode or self.stealth:
-            queue = overlay_begin() if self.overlay_enabled else None
-            if self.is_boss_mode:
-                prof = PROFILES[self.boss_profile_idx % len(PROFILES)]
-                renderable = render_boss_view(prof, trackers=self.trackers)
-            else:
-                renderable = stealth_mod.render_log_view(self.trackers, self.selected_symbol)
-            overlay_end()
-            self.overlay_items = queue or []
-            view_widget.update(renderable)
+        if self.is_boss_mode:
+            view_widget.update(self.boss_renderable())
             view_widget.styles.width = "100%"
         elif self.is_portfolio_mode:
             port = load_portfolio()
@@ -863,97 +844,78 @@ class StockTerminalApp(App):
             view_widget.update(tbl)
             self.fit_table_width(view_widget, tbl)
 
-    def apply_stealth(self) -> None:
-        """Re-render every visible view in or out of the disguise."""
-        self.title = "ops-console" if self.stealth else t("app_title")
+    def boss_renderable(self):
+        """The single disguise page; trend images are queued for the overlay painter."""
+        queue = overlay_begin() if self.overlay_enabled else None
+        renderable = render_boss_view(trackers=self.trackers)
+        overlay_end()
+        self.overlay_items = queue or []
+        return renderable
+
+    def set_boss(self, on: bool) -> None:
+        """Enter or leave the disguise on the main view or over whichever modal is open."""
+        top = self.top_screen()
+        if on:
+            if len(self.screen_stack) > 1:
+                if not isinstance(top, BossScreen):
+                    self.push_screen(BossScreen(self.boss_renderable()))
+            else:
+                self.is_boss_mode = True
+        else:
+            if isinstance(top, BossScreen):
+                self.pop_screen()
+            self.is_boss_mode = False
+        self.title = "ops-console" if self.is_boss_mode else t("app_title")
         try:
-            self.query_one(Footer).display = not self.stealth
+            self.query_one(Footer).display = not self.is_boss_mode
         except Exception:
             pass
         self.update_view()
-        for scr in self.screen_stack:
-            if isinstance(scr, DetailModal):
-                scr.update_content()
 
-    def ops_profile(self) -> bool:
-        return PROFILES[self.boss_profile_idx % len(PROFILES)] == "ops"
+    def in_boss(self) -> bool:
+        return self.is_boss_mode or isinstance(self.top_screen(), BossScreen)
 
-    def engage_auto_stealth(self) -> None:
-        """Disguise everything after inactivity or when the terminal loses focus."""
-        if self.is_boss_mode or isinstance(self.top_screen(), BossScreen):
-            return
-        if len(self.screen_stack) > 1 and not isinstance(self.top_screen(), DetailModal):
-            self.push_screen(BossScreen(self.boss_renderable()))
-        if self.stealth or self.is_boss_mode:
-            return
-        self.stealth_auto = True
-        if self.ops_profile():
-            self.stealth = True
-            self.apply_stealth()
-        else:
-            self.is_boss_mode = True
-            self.update_view()
-
-    def stealth_idle_tick(self) -> None:
+    def boss_idle_tick(self) -> None:
         if self.idle_seconds > 0 and time.monotonic() - self.last_activity > self.idle_seconds:
-            self.engage_auto_stealth()
+            self.engage_auto_boss()
+
+    def engage_auto_boss(self) -> None:
+        """Hide automatically after inactivity or window blur; any key brings the view back."""
+        if self.in_boss():
+            return
+        self.boss_auto = True
+        self.set_boss(True)
 
     def on_app_blur(self, event) -> None:
-        self.engage_auto_stealth()
+        self.engage_auto_boss()
 
     async def on_event(self, event) -> None:
         if isinstance(event, (events.Key, events.MouseDown, events.MouseMove, events.MouseScrollDown, events.MouseScrollUp)):
             self.last_activity = time.monotonic()
-            if self.stealth and self.stealth_auto:
-                self.stealth, self.stealth_auto = False, False
-                self.apply_stealth()
+            if self.boss_auto and self.in_boss():
+                self.boss_auto = False
+                self.set_boss(False)
         await super().on_event(event)
-
-    def boss_renderable(self):
-        return render_boss_view(PROFILES[self.boss_profile_idx % len(PROFILES)], trackers=self.trackers)
 
     def top_screen(self):
         return self.screen_stack[-1] if self.screen_stack else None
 
     def action_toggle_boss(self, from_key: bool = True) -> None:
-        """Instantly toggle Boss Mode disguise, on the main view and over every modal."""
+        """Manual boss key: stays on until pressed again."""
         if from_key and self.screen_stack and isinstance(self.focused, Input):
             self.focused.insert_text_at_cursor("b")
             return
-        self.stealth_auto = False
-        top = self.top_screen()
-        if isinstance(top, BossScreen):
-            self.pop_screen()
-        elif isinstance(top, DetailModal) and self.ops_profile() and not self.is_boss_mode:
-            self.stealth = not self.stealth
-            self.apply_stealth()
-        elif len(self.screen_stack) > 1:
-            self.push_screen(BossScreen(self.boss_renderable()))
-        elif self.ops_profile():
-            self.stealth = not self.stealth
-            self.apply_stealth()
-        else:
-            self.is_boss_mode = not self.is_boss_mode
-            self.update_view()
+        self.boss_auto = False
+        self.set_boss(not self.in_boss())
 
     def action_handle_escape(self) -> None:
         """Escape leaves the disguise, closes the active modal, or toggles boss mode."""
-        if len(self.screen_stack) > 1:
+        if self.in_boss():
+            self.action_toggle_boss(from_key=False)
+        elif len(self.screen_stack) > 1:
             self.pop_screen()
         else:
             self.action_toggle_boss()
-
-    def action_cycle_boss_profile(self) -> None:
-        """Cycle through Boss mode profiles."""
-        if isinstance(self.top_screen(), BossScreen):
-            self.boss_profile_idx = (self.boss_profile_idx + 1) % len(PROFILES)
-            self.screen.query_one("#boss-view", Static).update(self.boss_renderable())
-        elif self.is_boss_mode or self.stealth:
-            self.boss_profile_idx = (self.boss_profile_idx + 1) % len(PROFILES)
-            ops = self.ops_profile()
-            self.is_boss_mode = not ops
-            self.stealth = ops
-            self.apply_stealth()
 
     def action_toggle_portfolio(self) -> None:
         """Toggle between Watchlist and Portfolio asset view."""
@@ -987,7 +949,7 @@ class StockTerminalApp(App):
 
     def action_show_detail(self) -> None:
         """Show detail view for highlighted stock."""
-        if self.trackers:
+        if self.trackers and not self.in_boss():
             tr = self.current_tracker()
             self.push_screen(DetailModal(tr, palette=self.palette))
 

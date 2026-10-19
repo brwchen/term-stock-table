@@ -161,7 +161,7 @@ stk --boss --boss-profile cpp
 | <kbd>g</kbd> / <kbd>G</kbd> | **Home / End** | Jump to top / bottom of watchlist |
 | <kbd>T</kbd> | **Theme Selector** | Open theme picker (Bloomberg, Tokyo Night, Catppuccin, Cyberpunk, Nord, Gruvbox) |
 | <kbd>F</kbd> | **Custom Formula** | Open safe AST indicator formula expression calculator |
-| <kbd>b</kbd> / <kbd>ESC</kbd> | **Boss Key (摸鱼模式)** | Toggles the disguise. The default `ops` profile shows a `top` process list with holdings mixed in as rows named by the stock-name initials (e.g. `GZMT`) (RES = price, %CPU = change, VIRT = position, HIST = line trend) and the detail page as latency charts; <kbd>Tab</kbd> cycles other profiles. Auto-engages after `stealth_idle` seconds (default 20, `0` disables) idle or on terminal blur; any key restores |
+| <kbd>b</kbd> / <kbd>ESC</kbd> | **Boss Key (摸鱼模式)** | Works on every screen and shows one page: a `top` process list with your holdings as the first rows, named by stock-name initials (e.g. `GZMT`; RES = price, %CPU = change, VIRT = position, HIST = line trend). Pressing it keeps the page until pressed again. Without pressing it, the page appears automatically after `boss_idle` seconds of inactivity (default 20, `0` disables) or when the terminal loses focus, and any key restores the view |
 | <kbd>Ctrl</kbd>+<kbd>B</kbd> | **Boss Key in input dialogs** | Same as <kbd>b</kbd> where typing is active |
 | <kbd>Tab</kbd> | **Next Boss Profile** | Cycles camouflage disguise (DevOps → K8s → Neovim → GDB → C++ → Git → PyTorch → Nginx → Mono) |
 | <kbd>Enter</kbd> | **Stock Detail View** | Opens deep detail page (OHLC, Indicators, 5-Level Depth, Capital Flow, Notes) |
