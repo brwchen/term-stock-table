@@ -1,6 +1,7 @@
 """Rich table generator for professional terminal stock monitoring."""
 from typing import List, Optional, Dict, Any
 from rich.table import Table
+from rich.style import Style
 from rich.text import Text
 from rich.box import ROUNDED, HEAVY_EDGE, SIMPLE
 from .api import StockDataTracker
@@ -132,12 +133,13 @@ def create_stock_table(
         if alerts_triggered and tr.symbol in alerts_triggered:
             sym_display = f"🚨 {tr.symbol}"
 
+        click_style = Style(meta={"@click": f"app.open_detail('{tr.symbol}')"})
         row_cells = []
         for col_key in cols_to_show:
             if col_key == "symbol":
-                row_cells.append(sym_display)
+                row_cells.append(Text(sym_display, style=click_style))
             elif col_key == "name":
-                row_cells.append(tr.name)
+                row_cells.append(Text(tr.name, style=click_style))
             elif col_key == "price":
                 row_cells.append(Text(f"{tr.price:.2f}", style=color_style))
             elif col_key == "change_pct":

@@ -615,6 +615,16 @@ class StockTerminalApp(App):
         self.notify(f"Order: {'Descending (▼)' if self.sort_descending else 'Ascending (▲)'}")
         self.update_view()
 
+    def action_open_detail(self, symbol: str) -> None:
+        """Open the detail view for a clicked symbol/name cell."""
+        if len(self.screen_stack) > 1:
+            return
+        for i, tr in enumerate(self.trackers):
+            if tr.symbol == symbol:
+                self.selected_index = i
+                self.push_screen(DetailModal(tr, palette=self.palette))
+                return
+
     def action_show_detail(self) -> None:
         """Show detail view for highlighted stock."""
         if self.trackers:

@@ -73,7 +73,7 @@ Built on top of [`term-sparkline`](https://github.com/brwchen/term-sparkline) fo
     - **PyTorch ML Profile**: Deep learning training epoch loss loop.
     - **Nginx Profile**: `tail -f /var/log/nginx/access.log` HTTP stream.
     - **Monochrome Profile**: Grayscale neutral sensor telemetry table without market colors.
-- **Multi-period charts**: press Enter on a stock, then click (or press `1`-`8`) to switch between intraday / 5-60min / daily / weekly / monthly K-lines (real Tencent data for A-shares, HK and US daily+; simulated fallback otherwise).
+- **Multi-period charts**: click a stock's code/name (or press Enter), then click (or press `1`-`8`) to switch between intraday / 5-60min / daily / weekly / monthly K-lines (real Tencent data for A-shares, HK and US daily+; simulated fallback otherwise).
 - **Interactive TUI** (`stk`): Full-featured Textual terminal dashboard with keyboard shortcuts, sorting and smooth image curves on iTerm2.
 
 ---
