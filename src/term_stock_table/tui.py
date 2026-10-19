@@ -4,7 +4,8 @@ import dataclasses
 import sys
 from typing import List, Optional, Dict, Any
 from textual.app import App, ComposeResult
-from textual.containers import Container, Vertical, Horizontal
+from textual.containers import Container, Vertical, Horizontal, VerticalScroll
+from textual.geometry import Region
 from textual.widgets import Header, Footer, Static, Input, Button, Label, DataTable
 from textual.screen import ModalScreen, Screen
 from textual.binding import Binding
@@ -352,6 +353,10 @@ class DetailModal(ModalScreen[None]):
         self.set_period(self.PERIODS[nxt])
 
 
+class MainScroll(VerticalScroll, can_focus=False):
+    """Scrollable container that leaves arrow keys to the stock selection bindings."""
+
+
 class StockTerminalApp(App):
     """Main Textual TUI Application for term-stock-table."""
 
@@ -359,9 +364,13 @@ class StockTerminalApp(App):
     Screen {
         background: #0f1117;
     }
+    #main-scroll {
+        width: 100%;
+        height: 1fr;
+    }
     #main-table-view {
         width: 100%;
-        height: 100%;
+        height: auto;
         padding: 0 1;
     }
     #note-dialog, #add-dialog, #alert-dialog {
@@ -478,7 +487,8 @@ class StockTerminalApp(App):
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
-        yield Static(id="main-table-view")
+        with MainScroll(id="main-scroll"):
+            yield Static(id="main-table-view")
         yield Footer()
 
     def on_mount(self) -> None:
@@ -518,6 +528,30 @@ class StockTerminalApp(App):
 
         driver.write = write
 
+    TABLE_HEADER_LINES = 4
+
+    @property
+    def row_height(self) -> int:
+        return 1 if self.overlay_enabled else 2
+
+    def hidden_rows_above(self) -> int:
+        """Rows scrolled out of view above the viewport (so images map to the right stock)."""
+        if not self.overlay_enabled:
+            return 0
+        scroll_y = int(self.query_one("#main-scroll").scroll_y)
+        return max(0, scroll_y - self.TABLE_HEADER_LINES) // self.row_height
+
+    def scroll_to_selected(self) -> None:
+        """Keep the highlighted row inside the visible viewport."""
+        if self.is_boss_mode or self.is_portfolio_mode:
+            return
+        scroll = self.query_one("#main-scroll")
+        if self.selected_index == 0:
+            scroll.scroll_home(animate=False)
+            return
+        y = self.TABLE_HEADER_LINES + self.selected_index * self.row_height
+        scroll.scroll_to_region(Region(0, y, 1, self.row_height), animate=False)
+
     def overlay_payload(self) -> str:
         if not self.overlay_items or len(self.screen_stack) > 1:
             return ""
@@ -527,7 +561,8 @@ class StockTerminalApp(App):
             return ""
         blank = overlay_blank(OVERLAY_BLANK_WIDTH)
         out = ["\x1b7"]
-        idx = 0
+        idx = self.hidden_rows_above()
+        first = idx
         for y, strip in enumerate(strips):
             text = strip.text
             x = text.find(blank)
@@ -538,7 +573,7 @@ class StockTerminalApp(App):
             img = _image(tuple(data), length, palette, (("fill", False), ("show_dot", False)))
             out.append(f"\x1b[{y + 1};{cell_len(text[:x]) + 1}H{img}")
         out.append("\x1b8")
-        return "".join(out) if idx else ""
+        return "".join(out) if idx > first else ""
 
     def refresh_trackers_from_disk(self) -> None:
         """Reload watchlist from disk."""
@@ -717,6 +752,7 @@ class StockTerminalApp(App):
             self.selected_index = index % len(ordered)
             self.selected_symbol = ordered[self.selected_index].symbol
             self.update_view()
+            self.call_after_refresh(self.scroll_to_selected)
 
     def action_cursor_down(self) -> None:
         """Vim 'j' / Down: Move highlighted stock selection down."""
