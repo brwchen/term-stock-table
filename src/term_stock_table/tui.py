@@ -24,7 +24,7 @@ from .config import (
     load_alerts,
     save_alert,
 )
-from .table import create_stock_table
+from .table import create_stock_table, sort_trackers
 from .i18n import t, set_lang, toggle_lang, get_lang
 from .detail import render_stock_detail, period_label, candles_from_prices
 from .inline_spark import (
@@ -466,6 +466,7 @@ class StockTerminalApp(App):
             StockDataTracker(sym) for sym in self.symbols_list
         ]
         self.selected_index: int = 0
+        self.selected_symbol: Optional[str] = None
         self.is_boss_mode: bool = False
         self.is_portfolio_mode: bool = False
         self.boss_profile_idx: int = 0
@@ -611,6 +612,7 @@ class StockTerminalApp(App):
                 sort_by=sort_col,
                 reverse=self.sort_descending,
                 alerts_triggered=self.alerts_triggered,
+                selected_symbol=self.current_tracker().symbol if self.trackers else None,
             )
             overlay_end()
             self.overlay_items = queue or []
@@ -657,28 +659,29 @@ class StockTerminalApp(App):
         """Open the detail view for a clicked symbol/name cell."""
         if len(self.screen_stack) > 1:
             return
-        for i, tr in enumerate(self.trackers):
+        for i, tr in enumerate(self.ordered_trackers()):
             if tr.symbol == symbol:
                 self.selected_index = i
+                self.selected_symbol = symbol
                 self.push_screen(DetailModal(tr, palette=self.palette))
                 return
 
     def action_show_detail(self) -> None:
         """Show detail view for highlighted stock."""
         if self.trackers:
-            tr = self.trackers[self.selected_index % len(self.trackers)]
+            tr = self.current_tracker()
             self.push_screen(DetailModal(tr, palette=self.palette))
 
     def action_add_note(self) -> None:
         """Open note editor for current stock."""
         if self.trackers:
-            tr = self.trackers[self.selected_index % len(self.trackers)]
+            tr = self.current_tracker()
             self.push_screen(NoteModal(tr.symbol, tr.name))
 
     def action_set_alert(self) -> None:
         """Open alert configuration modal."""
         if self.trackers:
-            tr = self.trackers[self.selected_index % len(self.trackers)]
+            tr = self.current_tracker()
             self.push_screen(AlertModal(tr.symbol, tr.name))
 
     def action_add_stock(self) -> None:
@@ -688,38 +691,48 @@ class StockTerminalApp(App):
     def action_delete_stock(self) -> None:
         """Delete currently selected stock."""
         if self.trackers:
-            tr = self.trackers[self.selected_index % len(self.trackers)]
+            tr = self.current_tracker()
             remove_from_watchlist(tr.symbol)
             self.notify(t("n_removed", symbol=tr.symbol))
             self.refresh_trackers_from_disk()
 
+    def ordered_trackers(self) -> List[StockDataTracker]:
+        return sort_trackers(self.trackers, self.sort_columns[self.sort_col_idx], self.sort_descending)
+
+    def current_tracker(self) -> StockDataTracker:
+        """Highlighted stock; follows its symbol when live data re-sorts the table."""
+        ordered = self.ordered_trackers()
+        for i, tr in enumerate(ordered):
+            if tr.symbol == self.selected_symbol:
+                self.selected_index = i
+                return tr
+        tr = ordered[self.selected_index % len(ordered)]
+        self.selected_symbol = tr.symbol
+        return tr
+
+    def move_selection(self, index: int) -> None:
+        if self.trackers:
+            self.current_tracker()
+            ordered = self.ordered_trackers()
+            self.selected_index = index % len(ordered)
+            self.selected_symbol = ordered[self.selected_index].symbol
+            self.update_view()
+
     def action_cursor_down(self) -> None:
         """Vim 'j' / Down: Move highlighted stock selection down."""
-        if self.trackers:
-            self.selected_index = (self.selected_index + 1) % len(self.trackers)
-            tr = self.trackers[self.selected_index]
-            self.notify(t("n_selected", name=tr.name, symbol=tr.symbol))
+        self.move_selection(self.selected_index + 1)
 
     def action_cursor_up(self) -> None:
         """Vim 'k' / Up: Move highlighted stock selection up."""
-        if self.trackers:
-            self.selected_index = (self.selected_index - 1) % len(self.trackers)
-            tr = self.trackers[self.selected_index]
-            self.notify(t("n_selected", name=tr.name, symbol=tr.symbol))
+        self.move_selection(self.selected_index - 1)
 
     def action_cursor_top(self) -> None:
         """Vim 'g' / Home: Jump to first stock."""
-        if self.trackers:
-            self.selected_index = 0
-            tr = self.trackers[0]
-            self.notify(t("n_selected_top", name=tr.name, symbol=tr.symbol))
+        self.move_selection(0)
 
     def action_cursor_bottom(self) -> None:
         """Vim 'G' / End: Jump to last stock."""
-        if self.trackers:
-            self.selected_index = len(self.trackers) - 1
-            tr = self.trackers[-1]
-            self.notify(t("n_selected_bottom", name=tr.name, symbol=tr.symbol))
+        self.move_selection(len(self.trackers) - 1)
 
     def action_show_themes(self) -> None:
         """Open theme preset switcher modal."""
@@ -740,7 +753,7 @@ class StockTerminalApp(App):
     def action_show_backtest(self) -> None:
         """Open strategy backtest modal for current stock."""
         if self.trackers:
-            tr = self.trackers[self.selected_index % len(self.trackers)]
+            tr = self.current_tracker()
             self.push_screen(BacktestModal(tr, palette=self.palette))
 
     def action_toggle_palette(self) -> None:

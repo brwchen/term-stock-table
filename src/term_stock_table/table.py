@@ -31,6 +31,26 @@ def format_amount(amt: float) -> str:
     return f"{amt:.1f}"
 
 
+SORT_KEYS = {
+    "change_pct": lambda t: t.change_pct,
+    "price": lambda t: t.price,
+    "volume": lambda t: t.volume,
+    "amount": lambda t: t.amount,
+    "amplitude": lambda t: t.amplitude,
+    "turnover_rate": lambda t: t.turnover_rate,
+    "symbol": lambda t: t.symbol,
+    "pe": lambda t: (t.pe or 0.0),
+}
+
+
+def sort_trackers(trackers: List[StockDataTracker], sort_by: Optional[str] = None, reverse: bool = True) -> List[StockDataTracker]:
+    """Return trackers in the order the table displays them."""
+    ordered = list(trackers)
+    if sort_by in SORT_KEYS:
+        ordered.sort(key=SORT_KEYS[sort_by], reverse=reverse)
+    return ordered
+
+
 def create_stock_table(
     trackers: List[StockDataTracker],
     palette: str = "cn",
@@ -40,25 +60,12 @@ def create_stock_table(
     sort_by: Optional[str] = None,
     reverse: bool = True,
     alerts_triggered: Optional[Dict[str, List[str]]] = None,
+    selected_symbol: Optional[str] = None,
 ) -> Table:
     """Create a high-density, professional Rich Table for stock monitoring with sorting & alert indicators."""
     is_cn = (palette == "cn")
     spark_rows = 1 if _isp.OVERLAY_QUEUE is not None else 2
-    # Sort trackers if requested
-    sorted_trackers = list(trackers)
-    if sort_by:
-        key_map = {
-            "change_pct": lambda t: t.change_pct,
-            "price": lambda t: t.price,
-            "volume": lambda t: t.volume,
-            "amount": lambda t: t.amount,
-            "amplitude": lambda t: t.amplitude,
-            "turnover_rate": lambda t: t.turnover_rate,
-            "symbol": lambda t: t.symbol,
-            "pe": lambda t: (t.pe or 0.0),
-        }
-        if sort_by in key_map:
-            sorted_trackers.sort(key=key_map[sort_by], reverse=reverse)
+    sorted_trackers = sort_trackers(trackers, sort_by, reverse)
 
     table = Table(
         box=ROUNDED,
@@ -162,7 +169,7 @@ def create_stock_table(
             elif col_key == "sparkline":
                 row_cells.append(spark_text)
 
-        table.add_row(*row_cells)
+        table.add_row(*row_cells, style="on grey23" if tr.symbol == selected_symbol else None)
 
     # Market Sentiment in Caption
     total = len(sorted_trackers)
