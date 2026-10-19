@@ -9,6 +9,9 @@ from textual.geometry import Region
 from textual.widgets import Header, Footer, Static, Input, Button, Label, DataTable
 from textual.screen import ModalScreen, Screen
 from textual.binding import Binding
+from textual.scrollbar import ScrollBar, ScrollBarRender
+from rich.segment import Segment, Segments
+from rich.style import Style as RichStyle
 from textual import work
 
 from .api import StockDataTracker, fetch_live_quotes, fetch_kline
@@ -158,6 +161,32 @@ class AddStockModal(ModalScreen[None]):
             self.dismiss()
         else:
             self.dismiss()
+
+
+class ThinScrollBarRender(ScrollBarRender):
+    """Hairline scrollbar: a one-eighth-cell thumb on a blank track."""
+
+    @classmethod
+    def render_bar(cls, size=25, virtual_size=50, window_size=20, position=0,
+                   thickness=1, vertical=True, back_color=None, bar_color=None):
+        glyph = "▕" if vertical else "▁"
+        width = 1 if not vertical else max(1, thickness)
+        grab = {"@mouse.down": "grab"}
+        if not (window_size and size and virtual_size and size != virtual_size):
+            return Segments([Segment(" " * width, RichStyle(bgcolor=back_color)) for _ in range(size)], new_lines=vertical)
+        thumb = max(1, round(size * window_size / virtual_size))
+        span = max(1, virtual_size - window_size)
+        start = round((size - thumb) * min(1.0, position / span))
+        segs = []
+        for i in range(size):
+            if start <= i < start + thumb:
+                segs.append(Segment(glyph * width, RichStyle(color=bar_color, bgcolor=back_color, meta=grab)))
+            else:
+                segs.append(Segment(" " * width, RichStyle(bgcolor=back_color)))
+        return Segments(segs, new_lines=vertical)
+
+
+ScrollBar.renderer = ThinScrollBarRender
 
 
 class DetailScroll(ScrollableContainer, can_focus=False):
@@ -401,8 +430,7 @@ class StockTerminalApp(App):
     """Main Textual TUI Application for term-stock-table."""
 
     CSS = """
-    Screen {
-        background: #0f1117;
+    * {
         scrollbar-size: 1 1;
         scrollbar-background: #0f1117;
         scrollbar-background-hover: #0f1117;
@@ -411,6 +439,9 @@ class StockTerminalApp(App):
         scrollbar-color-hover: #5e6a82;
         scrollbar-color-active: #81a1c1;
         scrollbar-corner-color: #0f1117;
+    }
+    Screen {
+        background: #0f1117;
     }
     #main-scroll {
         width: 100%;
