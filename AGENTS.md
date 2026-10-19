@@ -34,7 +34,8 @@ All new features or indicator enhancements must satisfy:
 When updating features, regenerate the corresponding feature GIFs:
 
 ```bash
-python3 tests/generate_feature_gifs.py
+# Record in text mode: vhs cannot display iTerm2 inline images
+STK_SPARK_MODE=text vhs assets/tapes/<name>.tape
 ```
 
 Target GIF files:
