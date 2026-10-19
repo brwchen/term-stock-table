@@ -18,7 +18,7 @@ from rich.panel import Panel
 from rich.text import Text
 from rich.columns import Columns
 
-from term_sparkline import sparkline
+from .inline_spark import smart_spark, labeled
 
 
 @dataclass
@@ -114,8 +114,8 @@ class MarketRadarTracker:
         up_bar = f"[{pos_color}]{'█' * up_blocks}[/][{neg_color}]{'█' * down_blocks}[/]"
 
         # Sparklines for capital flow
-        nb_spark = sparkline(s.northbound_curve, length=12, mode="braille", palette=self.palette)
-        sb_spark = sparkline(s.southbound_curve, length=12, mode="braille", palette=self.palette)
+        nb_spark = smart_spark(s.northbound_curve, 12, self.palette)
+        sb_spark = smart_spark(s.southbound_curve, 12, self.palette)
 
         grid = Table.grid(padding=(0, 2))
         grid.add_column(justify="left")
@@ -136,10 +136,10 @@ class MarketRadarTracker:
             f"[bold]赚钱效应:[/] [bold cyan]{(s.up_count / total_stocks * 100):.1f}% 胜率[/]"
         )
 
-        col3 = Text.from_markup(
-            f"[bold]北向资金 (沪深股通):[/] [{pos_color}]+{s.northbound_net_billion:.1f}亿[/]  {nb_spark}\n"
-            f"[bold]南向资金 (港股通):[/]   [{pos_color}]+{s.southbound_net_billion:.1f}亿[/]  {sb_spark}\n"
-            f"[bold]外资风向:[/] [bold green]净流入加仓[/]"
+        col3 = Group(
+            labeled(Text.from_markup(f"[bold]北向资金 (沪深股通):[/] [{pos_color}]+{s.northbound_net_billion:.1f}亿[/]"), nb_spark, 12),
+            labeled(Text.from_markup(f"[bold]南向资金 (港股通):[/]   [{pos_color}]+{s.southbound_net_billion:.1f}亿[/]"), sb_spark, 12),
+            Text.from_markup("[bold]外资风向:[/] [bold green]净流入加仓[/]"),
         )
 
         grid.add_row(col1, col2, col3)

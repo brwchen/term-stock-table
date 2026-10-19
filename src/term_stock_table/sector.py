@@ -16,7 +16,7 @@ from rich.panel import Panel
 from rich.text import Text
 from rich.columns import Columns
 
-from term_sparkline import sparkline
+from .inline_spark import smart_spark
 
 
 @dataclass
@@ -118,7 +118,7 @@ class SectorHeatmapTracker:
             l_col = pos_color if lead_pos else neg_color
             l_sign = "+" if lead_pos else ""
 
-            spark = sparkline(s.trend_history, length=8, mode="block", palette=self.palette) if s.trend_history else ""
+            spark = smart_spark(s.trend_history or [], 12, self.palette)
 
             table.add_row(
                 f"[bold cyan]#{i}[/]",
@@ -127,7 +127,7 @@ class SectorHeatmapTracker:
                 f"[yellow]{s.net_inflow_billion:+.1f} 亿[/]",
                 f"{s.leader_name} ([dim]{s.leader_symbol}[/])",
                 f"[{l_col}]{l_sign}{s.leader_pct:.2f}%[/]",
-                Text.from_ansi(spark),
+                spark,
             )
         return table
 

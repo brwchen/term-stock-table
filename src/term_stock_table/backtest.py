@@ -16,7 +16,7 @@ from rich.table import Table
 from rich.panel import Panel
 from rich.text import Text
 
-from term_sparkline import sparkline
+from .inline_spark import smart_spark, labeled
 
 
 @dataclass
@@ -122,8 +122,8 @@ class StrategyBacktester:
         pos_color = "red" if self.palette == "cn" else "green"
         neg_color = "green" if self.palette == "cn" else "red"
 
-        strat_spark = sparkline(res.strategy_curve, length=20, mode="braille", palette=self.palette)
-        bench_spark = sparkline(res.benchmark_curve, length=20, mode="braille", palette=self.palette)
+        strat_spark = smart_spark(res.strategy_curve, 20, self.palette)
+        bench_spark = smart_spark(res.benchmark_curve, 20, self.palette)
 
         ret_col = pos_color if res.total_return_pct >= 0 else neg_color
         bench_col = pos_color if res.benchmark_return_pct >= 0 else neg_color
@@ -142,12 +142,14 @@ class StrategyBacktester:
             f"• [bold]夏普比率 (Sharpe):[/] [bold yellow]{res.sharpe_ratio:.2f}[/]"
         )
 
-        col2 = Text.from_markup(
-            f"[bold]交易胜率与统计:[/] \n"
-            f"• [bold]胜率 (Win Rate):[/] [bold yellow]{res.win_rate_pct}%[/]  (盈亏比: [bold cyan]{res.profit_factor:.1f}[/])\n"
-            f"• [bold]总交易次数:[/]     [bold white]{res.total_trades} 次[/]\n"
-            f"• [bold]策略净值走势:[/]   {strat_spark}\n"
-            f"• [bold]基准净值走势:[/]   {bench_spark}"
+        col2 = Group(
+            Text.from_markup(
+                f"[bold]交易胜率与统计:[/] \n"
+                f"• [bold]胜率 (Win Rate):[/] [bold yellow]{res.win_rate_pct}%[/]  (盈亏比: [bold cyan]{res.profit_factor:.1f}[/])\n"
+                f"• [bold]总交易次数:[/]     [bold white]{res.total_trades} 次[/]"
+            ),
+            labeled(Text.from_markup("• [bold]策略净值走势:[/]  "), strat_spark, 20),
+            labeled(Text.from_markup("• [bold]基准净值走势:[/]  "), bench_spark, 20),
         )
 
         grid.add_row(col1, col2)

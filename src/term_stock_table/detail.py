@@ -1,11 +1,13 @@
 """Comprehensive stock detail view, technical indicators, and investment notes."""
 from typing import List, Dict, Any, Optional
+from rich.console import Group
 from rich.panel import Panel
 from rich.table import Table
 from rich.layout import Layout
 from rich.text import Text
 from rich.box import ROUNDED, SIMPLE, DOUBLE_EDGE
 from term_sparkline import sparkline, price_volume_sparkline
+from .inline_spark import smart_spark
 from .api import StockDataTracker
 from .indicators import (
     compute_bollinger_bands,
@@ -118,7 +120,15 @@ def render_stock_detail(
     chart_content.append(f"• KDJ (9,3,3) : K={last_k:.1f} | D={last_d:.1f} | J={last_j:.1f} | RSI(14)={last_rsi:.1f}", style="dim white")
 
     root["middle"]["chart_and_indicators"].update(
-        Panel(chart_content, title="📈 Technical Analysis & Curves (按 'k' 切换K线/走势)", box=ROUNDED)
+        Panel(
+            Group(
+                Text("─── Smooth Price Curve ───", style="bold gold1"),
+                smart_spark(price_list, 60, palette, fill=True, show_dot=True),
+                Text(""),
+                chart_content,
+            ),
+            title="📈 Technical Analysis & Curves (按 'k' 切换K线/走势)", box=ROUNDED,
+        )
     )
 
     # Right Column: Order Book + Capital Flow split

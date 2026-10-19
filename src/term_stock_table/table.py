@@ -1,12 +1,10 @@
 """Rich table generator for professional terminal stock monitoring."""
-import sys
 from typing import List, Optional, Dict, Any
 from rich.table import Table
 from rich.text import Text
 from rich.box import ROUNDED, HEAVY_EDGE, SIMPLE
-from term_sparkline import sparkline
 from .api import StockDataTracker
-from .inline_spark import InlineSparkCell, image_sparklines_supported
+from .inline_spark import smart_spark
 from .indicators import compute_bollinger_bands, render_bollinger_badge
 
 
@@ -42,7 +40,6 @@ def create_stock_table(
 ) -> Table:
     """Create a high-density, professional Rich Table for stock monitoring with sorting & alert indicators."""
     is_cn = (palette == "cn")
-    use_image = sys.stdout.isatty() and image_sparklines_supported()
     # Sort trackers if requested
     sorted_trackers = list(trackers)
     if sort_by:
@@ -122,16 +119,11 @@ def create_stock_table(
         bb_badge = "[·····]" if monochrome else render_bollinger_badge(pct_b, palette=palette)
 
         # Sparkline Curve
-        spark_kwargs = dict(palette=palette, fill=False, show_dot=False)
-        if use_image and not monochrome and len(price_list) >= 2:
-            last = price_list[-1]
-            pct = (last / price_list[0] - 1) * 100 if price_list[0] else 0.0
-            note = Text.from_ansi(f"[{last:.2f} {pct:+.2f}%]")
-            spark_text = InlineSparkCell(price_list, 16, note, **spark_kwargs)
-        else:
-            spark_text = Text.from_ansi(
-                sparkline(price_list, length=16, mode="block", annotate=(not monochrome), **spark_kwargs)
-            )
+        note = None
+        if not monochrome and len(price_list) >= 2:
+            pct = (price_list[-1] / price_list[0] - 1) * 100 if price_list[0] else 0.0
+            note = Text(f"[{price_list[-1]:.2f} {pct:+.2f}%]")
+        spark_text = smart_spark(price_list, 16, palette, note, fill=False, show_dot=False)
 
         sym_display = tr.symbol
         if alerts_triggered and tr.symbol in alerts_triggered:
