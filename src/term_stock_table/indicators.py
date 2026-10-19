@@ -178,6 +178,7 @@ def render_candlestick_chart(
     candles: List[Dict[str, float]],
     height: int = 7,
     palette: str = "cn",
+    gap: int = 0,
 ) -> str:
     """
     Render a character-based ASCII/Unicode candlestick chart.
@@ -237,6 +238,7 @@ def render_candlestick_chart(
                 row_str += f"{c_color}{c_char}{rst}"
             else:
                 row_str += c_char
+            row_str += " " * gap
         price_level = min_val + (y / (height - 1)) * val_range
         lines.append(f"{price_level:>8.2f} │ {row_str}")
         

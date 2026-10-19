@@ -823,3 +823,16 @@ def test_tracker_default_history_and_curve_keeps_spike():
     data[100] = 110.0
     flat = braille_curve([100.0] * 200, 8, 1).plain
     assert braille_curve(data, 8, 1).plain != flat
+
+
+def test_kline_period_detail_rendering():
+    from rich.console import Console
+    from term_stock_table.detail import candles_from_prices
+
+    candles = candles_from_prices([10 + (i % 7) * 0.3 for i in range(120)], count=30)
+    assert len(candles) >= 20 and all(c["high"] >= c["low"] for c in candles)
+    tracker = StockDataTracker("600519")
+    layout = render_stock_detail(tracker, period="day", candles=candles)
+    console = Console(width=160, height=50, record=True, file=io.StringIO())
+    console.print(layout)
+    assert "K-Line [日K]" in console.export_text()

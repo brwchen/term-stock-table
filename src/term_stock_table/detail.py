@@ -22,11 +22,60 @@ from .market import simulate_capital_flow
 from .config import get_symbol_notes
 
 
+PERIOD_LABELS = {
+    "intraday": "分时", "m5": "5分", "m15": "15分", "m30": "30分", "m60": "60分",
+    "day": "日K", "week": "周K", "month": "月K",
+}
+
+
+def candles_from_prices(prices: List[float], count: int = 30) -> List[Dict[str, Any]]:
+    """Bucket a price series into synthetic candles (used when real K-lines are unavailable)."""
+    if len(prices) < 2:
+        return []
+    step = max(1, len(prices) // count)
+    out = []
+    for i in range(0, len(prices), step):
+        sub = prices[i : i + step]
+        out.append({"date": f"#{len(out) + 1}", "open": sub[0], "close": sub[-1], "high": max(sub), "low": min(sub), "volume": 0.0})
+    return out
+
+
+class CandleView:
+    """Candlestick + volume block that sizes itself to the available width at render time."""
+
+    def __init__(self, candles: List[Dict[str, Any]], period: str, palette: str = "cn"):
+        self.candles = candles
+        self.period = period
+        self.palette = palette
+
+    def __rich_console__(self, console, options):
+        n = max(8, (options.max_width - 12) // 2)
+        shown = self.candles[-n:]
+        last = shown[-1]
+        yield Text(f"─── K-Line [{period_label(self.period)}] {shown[0]['date']} → {last['date']} ───", style="bold gold1")
+        for line in render_candlestick_chart(shown, height=10, palette=self.palette, gap=1).split("\n"):
+            yield Text.from_ansi(line)
+        yield Text(
+            f"O {last['open']:.2f}  H {last['high']:.2f}  L {last['low']:.2f}  C {last['close']:.2f}",
+            style="dim white",
+        )
+        vols = [c.get("volume", 0.0) for c in shown]
+        if any(vols):
+            yield Text("─── Volume ───", style="bold gold1")
+            yield Text.from_ansi(sparkline(vols, length=len(vols), mode="block", palette=self.palette, annotate=False))
+
+
+def period_label(period: str) -> str:
+    return PERIOD_LABELS.get(period, period)
+
+
 def render_stock_detail(
     tracker: StockDataTracker,
     palette: str = "cn",
     notes: Optional[List[Dict[str, Any]]] = None,
-    show_candlestick: bool = False,
+    period: str = "intraday",
+    candles: Optional[List[Dict[str, Any]]] = None,
+    period_note: str = "",
 ) -> Layout:
     """Render comprehensive multi-panel stock detail view."""
     is_cn = (palette == "cn")
@@ -65,6 +114,9 @@ def render_stock_detail(
 
     price_list = list(tracker.prices)
     vol_list = list(tracker.volumes)
+    k_mode = period != "intraday" and bool(candles)
+    if k_mode:
+        price_list = [c["close"] for c in candles]
 
     # Calculate indicators
     upper, mid, lower, pct_b, b_width = compute_bollinger_bands(price_list, window=20)
@@ -86,23 +138,12 @@ def render_stock_detail(
     ma20 = compute_sma(price_list, 20)[-1] or tracker.price
 
     chart_content = Text()
-    if show_candlestick:
-        # Generate sample intraday candles
-        sample_candles = []
-        step = max(1, len(price_list) // 10)
-        for i in range(0, len(price_list), step):
-            sub = price_list[i : i + step]
-            if sub:
-                sample_candles.append({
-                    "open": sub[0],
-                    "high": max(sub) * 1.002,
-                    "low": min(sub) * 0.998,
-                    "close": sub[-1],
-                })
-        candle_str = render_candlestick_chart(sample_candles, height=6, palette=palette)
-        chart_content.append("─── Multi-Period Candlestick (K-Line) ───\n", style="bold gold1")
-        chart_content.append(Text.from_ansi(candle_str))
+    candle_view = None
+    if k_mode:
+        candle_view = CandleView(candles, period, palette)
     else:
+        if period != "intraday" and period_note:
+            chart_content.append(f"{period_note}\n", style="bold yellow")
         vol_bars = sparkline(vol_list, length=40, mode="block", palette=palette, annotate=False)
         chart_content.append("─── Intraday Volume ───\n", style="bold gold1")
         chart_content.append(Text.from_ansi(vol_bars))
@@ -116,12 +157,18 @@ def render_stock_detail(
     root["middle"]["chart_and_indicators"].update(
         Panel(
             Group(
-                Text("─── Smooth Price Curve ───", style="bold gold1"),
-                AutoCurve(price_list, rows=5, palette=palette),
-                Text(""),
+                *(
+                    [candle_view, Text("")]
+                    if candle_view
+                    else [
+                        Text("─── Smooth Price Curve ───", style="bold gold1"),
+                        AutoCurve(price_list, rows=5, palette=palette),
+                        Text(""),
+                    ]
+                ),
                 chart_content,
             ),
-            title="📈 Technical Analysis & Curves (按 'k' 切换K线/走势)", box=ROUNDED,
+            title="📈 Technical Analysis & Curves (点击按钮或按 1-8 切换周期)", box=ROUNDED,
         )
     )
 

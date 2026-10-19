@@ -151,6 +151,55 @@ def fetch_intraday_series(symbol: str, timeout: float = 4.0) -> List[Tuple[float
     return series
 
 
+KLINE_PERIODS = {
+    "m5": "5min", "m15": "15min", "m30": "30min", "m60": "60min",
+    "day": "Daily", "week": "Weekly", "month": "Monthly",
+}
+
+
+def _kline_urls(code: str, period: str, count: int) -> List[Tuple[str, str]]:
+    """Candidate (url, code) pairs for a period; US tickers need an exchange suffix."""
+    codes = [code + ".OQ", code, code + ".N"] if code.startswith("us") else [code]
+    out = []
+    for c in codes:
+        if period in ("m5", "m15", "m30", "m60"):
+            out.append((f"https://ifzq.gtimg.cn/appstock/app/kline/mkline?param={c},{period},,{count}", c))
+        else:
+            out.append((f"https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?param={c},{period},,,{count},qfq", c))
+    return out
+
+
+def fetch_kline(symbol: str, period: str = "day", count: int = 60, timeout: float = 4.0) -> List[Dict[str, Any]]:
+    """Fetch OHLCV candles from Tencent for m5/m15/m30/m60/day/week/month; [] if unavailable."""
+    if period not in KLINE_PERIODS:
+        return []
+    code = normalize_symbol_code(symbol)
+    for url, c in _kline_urls(code, period, count):
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (term-stock-table)"})
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                payload = json.loads(resp.read().decode("utf-8", errors="ignore"))
+            node = payload["data"][c]
+            rows = next((v for k, v in node.items() if k != "qt" and k.endswith(period) and isinstance(v, list)), [])
+        except Exception:
+            continue
+        candles = []
+        for r in rows:
+            try:
+                # Tencent column order: time, open, close, high, low, volume
+                candles.append({
+                    "date": str(r[0]),
+                    "open": float(r[1]), "close": float(r[2]),
+                    "high": float(r[3]), "low": float(r[4]),
+                    "volume": float(r[5]),
+                })
+            except (ValueError, IndexError):
+                continue
+        if candles:
+            return candles[-count:]
+    return []
+
+
 class StockDataTracker:
     """Tracks historical series, intraday ticks, indicators, and live quotes."""
 

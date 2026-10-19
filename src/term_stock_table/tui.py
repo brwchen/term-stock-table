@@ -9,7 +9,7 @@ from textual.screen import ModalScreen, Screen
 from textual.binding import Binding
 from textual import work
 
-from .api import StockDataTracker, fetch_live_quotes
+from .api import StockDataTracker, fetch_live_quotes, fetch_kline
 from .config import (
     load_watchlist,
     save_watchlist,
@@ -24,7 +24,7 @@ from .config import (
     save_alert,
 )
 from .table import create_stock_table
-from .detail import render_stock_detail
+from .detail import render_stock_detail, period_label, candles_from_prices
 from .inline_spark import (
     set_image_enabled,
     terminal_supports_images,
@@ -264,19 +264,25 @@ class FormulaModal(ModalScreen[None]):
 
 
 class DetailModal(ModalScreen[None]):
-    """Modal screen for comprehensive stock detail view."""
+    """Modal screen for comprehensive stock detail view with switchable chart periods."""
+
+    PERIODS = ["intraday", "m5", "m15", "m30", "m60", "day", "week", "month"]
 
     def __init__(self, tracker: StockDataTracker, palette: str = "cn"):
         super().__init__()
         self.tracker = tracker
         self.palette = palette
-        self.show_candle = False
+        self.period = "intraday"
+        self.kline_cache: Dict[str, List[Dict[str, Any]]] = {}
+        self.kline_note: Dict[str, str] = {}
 
     def compose(self) -> ComposeResult:
         with Vertical(id="detail-container"):
             yield Static(id="detail-view")
+            with Horizontal(id="detail-periods"):
+                for i, p in enumerate(self.PERIODS, 1):
+                    yield Button(f"{period_label(p)} ({i})", id=f"period-{p}", variant="default")
             with Horizontal(id="detail-footer"):
-                yield Button("K-Line / Sparkline ('k')", id="detail-candle-btn", variant="warning")
                 yield Button("Add Note ('n')", id="detail-note-btn", variant="primary")
                 yield Button("Close (Esc/Enter)", id="detail-close-btn", variant="default")
 
@@ -289,18 +295,46 @@ class DetailModal(ModalScreen[None]):
             self.tracker,
             palette=self.palette,
             notes=notes,
-            show_candlestick=self.show_candle,
+            period=self.period,
+            candles=self.kline_cache.get(self.period),
+            period_note=self.kline_note.get(self.period, ""),
         )
         self.query_one("#detail-view", Static).update(layout)
+        for p in self.PERIODS:
+            self.query_one(f"#period-{p}", Button).variant = "warning" if p == self.period else "default"
+
+    def set_period(self, period: str) -> None:
+        self.period = period
+        if period != "intraday" and period not in self.kline_cache:
+            self.kline_note[period] = "Loading K-line data..."
+            self.run_worker(lambda: self.load_kline(period), thread=True, exclusive=True, group="kline")
+        self.update_content()
+
+    def load_kline(self, period: str) -> None:
+        candles: List[Dict[str, Any]] = []
+        note = ""
+        if getattr(self.app, "use_real_data", False):
+            candles = fetch_kline(self.tracker.symbol, period)
+        if not candles:
+            candles = candles_from_prices(list(self.tracker.prices))
+            note = "Simulated candles (real K-line data unavailable for this period/market)"
+        self.kline_cache[period] = candles
+        self.kline_note[period] = note
+        self.app.call_from_thread(self.update_content)
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
-        if event.button.id == "detail-note-btn":
+        bid = event.button.id or ""
+        if bid.startswith("period-"):
+            self.set_period(bid[len("period-"):])
+        elif bid == "detail-note-btn":
             self.app.push_screen(NoteModal(self.tracker.symbol, self.tracker.name))
-        elif event.button.id == "detail-candle-btn":
-            self.show_candle = not self.show_candle
-            self.update_content()
         else:
             self.dismiss()
+
+    def on_key(self, event) -> None:
+        if event.key in {str(i) for i in range(1, len(self.PERIODS) + 1)}:
+            self.set_period(self.PERIODS[int(event.key) - 1])
+            event.stop()
 
     def key_escape(self) -> None:
         self.dismiss()
@@ -312,8 +346,8 @@ class DetailModal(ModalScreen[None]):
         self.app.push_screen(NoteModal(self.tracker.symbol, self.tracker.name))
 
     def key_k(self) -> None:
-        self.show_candle = not self.show_candle
-        self.update_content()
+        nxt = (self.PERIODS.index(self.period) + 1) % len(self.PERIODS)
+        self.set_period(self.PERIODS[nxt])
 
 
 class StockTerminalApp(App):
@@ -347,6 +381,10 @@ class StockTerminalApp(App):
     #detail-view {
         width: 100%;
         height: 1fr;
+    }
+    #detail-periods {
+        height: 3;
+        align: center middle;
     }
     #detail-footer {
         height: 3;
