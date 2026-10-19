@@ -417,8 +417,12 @@ class DetailModal(ScrollKeysMixin, ModalScreen[None]):
 
     def place_popup(self) -> None:
         """Right-align the drop-down under the header corner (layer children are centred by default)."""
-        width = self.query_one("#detail-header").size.width or self.size.width
-        self.query_one("#detail-popup").styles.offset = ((width - self.POPUP_WIDTH) // 2, -3)
+        header = self.query_one("#detail-header")
+        top = self.query_one("#detail-container").content_region.y
+        self.query_one("#detail-popup").styles.offset = (
+            (header.size.width - self.POPUP_WIDTH) // 2,
+            max(0, header.region.bottom - top),
+        )
 
     def on_resize(self, event) -> None:
         self.call_after_refresh(self.place_popup)
@@ -504,7 +508,7 @@ class StockTerminalApp(App):
         background: #0f1117;
         border: solid $accent;
         padding: 0 1;
-        align: center middle;
+        align: center top;
     }
     #detail-scroll {
         width: 100%;
@@ -525,7 +529,7 @@ class StockTerminalApp(App):
         display: none;
         height: auto;
         width: 46;
-        offset: 0 -3;
+        offset: 0 6;
         background: #0f1117;
     }
     #detail-header {
