@@ -7,6 +7,8 @@ from rich.panel import Panel
 from rich.text import Text
 from rich.box import SIMPLE, SQUARE, ROUNDED
 
+LIGHT_ORANGE, LIGHT_BLUE = "#ffb366", "#8fd3ff"
+LIGHT_ORANGE_RGB, LIGHT_BLUE_RGB = (255, 179, 102), (143, 211, 255)
 PROFILES = ["ops", "devops", "kubectl", "nginx", "cpp", "git", "python", "neovim", "gdb", "monochrome"]
 
 
@@ -18,7 +20,7 @@ def render_devops_top(trackers=None, selected_symbol: Optional[str] = None, widt
         collapse_padding=True,
         show_header=True,
         header_style="bold black on grey70",
-        title_style="bold green",
+        title_style="bold #8fd3ff",
     )
     table.title = f"top - {time.strftime('%H:%M:%S')} up 42 days, 14:12, 2 users, load average: 1.42, 1.28, 1.15"
     table.caption = "Tasks: 312 total, 1 running, 311 sleeping, 0 stopped, 0 zombie | %Cpu(s): 4.2 us, 1.8 sy, 0.0 ni, 93.8 id"
@@ -26,7 +28,7 @@ def render_devops_top(trackers=None, selected_symbol: Optional[str] = None, widt
     cols = [
         ("PID", "right", "bold cyan", 6), ("USER", "left", "white", 8), ("PR", "right", "dim", 3),
         ("NI", "right", "dim", 3), ("VIRT", "right", "dim", 6), ("RES", "right", "dim", 8),
-        ("SHR", "right", "dim", 5), ("S", "center", "bold green", 2), ("%CPU", "right", "bold green", 7),
+        ("SHR", "right", "dim", 5), ("S", "center", "bold #8fd3ff", 2), ("%CPU", "right", "bold #8fd3ff", 7),
         ("%MEM", "right", "cyan", 5), ("TIME+", "right", "dim", 10),
     ]
     if trackers:
@@ -86,7 +88,7 @@ def _stock_process_row(tr, selected_symbol):
     prev = tr.prev_close or prices[0]
     pct = (prices[-1] - prev) / prev * 100 if prev else 0.0
     shares = float((load_portfolio().get(tr.symbol) or {}).get("shares", 0) or 0)
-    tone = "orange3" if pct < 0 else "deep_sky_blue1"
+    tone = LIGHT_BLUE if pct < 0 else LIGHT_ORANGE
     pid = 1000 + int(hashlib.md5(tr.symbol.encode()).hexdigest()[:6], 16) % 8000
     style = "reverse" if tr.symbol == selected_symbol else ""
     row = (
@@ -94,7 +96,7 @@ def _stock_process_row(tr, selected_symbol):
         f"{shares:,.0f}" if shares else "-",
         f"{prices[-1]:,.2f}", "12M", "S",
         Text(f"{pct:+.2f}", style=tone), "0.4", "00:12.07",
-        smart_spark(prices[-60:], length=20, up=pct >= 0),
+        smart_spark(prices[-60:], length=20, up=pct >= 0, color=LIGHT_BLUE_RGB if pct < 0 else LIGHT_ORANGE_RGB),
         service_name(tr.symbol, tr.name).removeprefix("svc-").upper(),
     )
     return tuple(Text(c, style=style) if isinstance(c, str) else c for c in row)

@@ -761,9 +761,10 @@ class StockTerminalApp(App):
             x = text.find(blank)
             if x < 0 or idx >= len(self.overlay_items):
                 continue
-            data, length, palette = self.overlay_items[idx]
+            data, length, palette, color = self.overlay_items[idx]
             idx += 1
-            img = _image(tuple(data), length, palette, (("fill", False), ("show_dot", False)))
+            extra = (("fill", False), ("show_dot", False)) + ((("color", color),) if color else ())
+            img = _image(tuple(data), length, palette, extra)
             bg = self.cell_background(strip, x)
             if bg:
                 img = flatten_on(img, bg)

@@ -211,7 +211,7 @@ def smart_spark(
     """Smooth image curve on iTerm2-like terminals, connected braille curve elsewhere."""
     data = list(series)
     if OVERLAY_QUEUE is not None and rows == 1 and len(data) >= 2:
-        OVERLAY_QUEUE.append((data, length, palette))
+        OVERLAY_QUEUE.append((data, length, palette, kwargs.get("color")))
         text = Text(overlay_blank(length))
         if annotation is not None:
             text.append(" ")
@@ -219,7 +219,9 @@ def smart_spark(
         return text
     if rows == 1 and len(data) >= 2 and sys.stdout.isatty() and image_sparklines_supported():
         return InlineSparkCell(data, length, annotation, palette=palette, **{k: v for k, v in kwargs.items() if k != "up"})
-    text = braille_curve(data, length, rows, palette, fill=bool(kwargs.get("fill")), up=kwargs.get("up"))
+    color = kwargs.get("color")
+    text = braille_curve(data, length, rows, palette, fill=bool(kwargs.get("fill")), up=kwargs.get("up"),
+                         color="rgb(%d,%d,%d)" % tuple(color) if isinstance(color, tuple) else color)
     if annotation is not None:
         lines = text.split("\n")
         lines[0].append(" ")
