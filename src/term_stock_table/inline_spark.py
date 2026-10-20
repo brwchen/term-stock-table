@@ -168,6 +168,34 @@ def image_sparklines_supported() -> bool:
 
 
 @lru_cache(maxsize=512)
+@lru_cache(maxsize=512)
+def flatten_on(escape: str, rgb: tuple) -> str:
+    """Composite a transparent inline PNG onto the cell colour so it blends with the TUI.
+
+    iTerm2 shows transparent pixels over the default terminal background, which
+    differs from the explicit colours Textual paints, so the image is made opaque.
+    """
+    import base64
+    import io
+    import re
+
+    m = re.search(r"File=([^:]*):([A-Za-z0-9+/=]+)", escape)
+    if not m:
+        return escape
+    try:
+        from PIL import Image
+
+        img = Image.open(io.BytesIO(base64.b64decode(m.group(2)))).convert("RGBA")
+        out = Image.new("RGBA", img.size, tuple(rgb) + (255,))
+        out.alpha_composite(img)
+        buf = io.BytesIO()
+        out.save(buf, format="PNG")
+        data = base64.b64encode(buf.getvalue()).decode("ascii")
+    except Exception:
+        return escape
+    return escape[: m.start(2)] + data + escape[m.end(2):]
+
+
 def _image(series: tuple, length: int, palette: str, extra: tuple) -> str:
     return sparkline(list(series), length=length, mode="iterm2", annotate=False, palette=palette, width_px=length * 12, height_px=24, **dict(extra))
 

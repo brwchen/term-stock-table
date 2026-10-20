@@ -37,6 +37,7 @@ from .inline_spark import (
     terminal_supports_images,
     overlay_begin,
     overlay_end,
+    flatten_on,
     overlay_blank,
     OVERLAY_BLANK_WIDTH,
     _image,
@@ -732,6 +733,18 @@ class StockTerminalApp(App):
         y = self.TABLE_HEADER_LINES + self.selected_index * self.row_height
         scroll.scroll_to_region(Region(0, y, 1, self.row_height), animate=True, duration=0.15, easing="out_cubic")
 
+    @staticmethod
+    def cell_background(strip, x: int):
+        """RGB of the background painted under column x, or None when unstyled."""
+        try:
+            seg = next(iter(strip.crop(x, x + 1)))
+            color = seg.style.bgcolor if seg.style else None
+            if color is not None and color.triplet is not None:
+                return tuple(color.triplet)
+        except Exception:
+            pass
+        return None
+
     def overlay_payload(self) -> str:
         if not self.overlay_items or (len(self.screen_stack) > 1 and not isinstance(self.top_screen(), BossScreen)):
             return ""
@@ -751,6 +764,9 @@ class StockTerminalApp(App):
             data, length, palette = self.overlay_items[idx]
             idx += 1
             img = _image(tuple(data), length, palette, (("fill", False), ("show_dot", False)))
+            bg = self.cell_background(strip, x)
+            if bg:
+                img = flatten_on(img, bg)
             out.append(f"\x1b[{y + 1};{cell_len(text[:x]) + 1}H{img}")
         out.append("\x1b8")
         return "".join(out) if idx > first else ""
