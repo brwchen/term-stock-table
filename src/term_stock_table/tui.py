@@ -175,6 +175,9 @@ class BossScreen(Screen):
     def compose(self) -> ComposeResult:
         yield Static(self.renderable, id="boss-view")
 
+    def on_mount(self) -> None:
+        self.add_class("boss-bg")
+
 
 class ThinScrollBarRender(ScrollBarRender):
     """Hairline scrollbar: a one-eighth-cell thumb on a blank track."""
@@ -492,6 +495,15 @@ class StockTerminalApp(App):
     }
     Screen {
         background: #0f1117;
+    }
+    Screen.boss-bg {
+        background: ansi_default;
+    }
+    Screen.boss-bg * {
+        scrollbar-background: ansi_default;
+        scrollbar-background-hover: ansi_default;
+        scrollbar-background-active: ansi_default;
+        scrollbar-corner-color: ansi_default;
     }
     Footer {
         overflow: hidden hidden;
@@ -883,6 +895,8 @@ class StockTerminalApp(App):
                 self.pop_screen()
             self.is_boss_mode = False
         self.title = "ops-console" if self.is_boss_mode else t("app_title")
+        self.screen.set_class(self.is_boss_mode, "boss-bg")
+        self.ansi_color = True if on else None
         try:
             self.query_one(Footer).display = not self.is_boss_mode
         except Exception:
