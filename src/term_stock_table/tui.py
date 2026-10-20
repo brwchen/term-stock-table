@@ -895,7 +895,8 @@ class StockTerminalApp(App):
                 self.pop_screen()
             self.is_boss_mode = False
         self.title = "ops-console" if self.is_boss_mode else t("app_title")
-        self.screen.set_class(self.is_boss_mode, "boss-bg")
+        if self.screen_stack:
+            self.screen.set_class(self.is_boss_mode, "boss-bg")
         self.ansi_color = True if on else None
         try:
             self.query_one(Footer).display = not self.is_boss_mode
