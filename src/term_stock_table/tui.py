@@ -847,7 +847,7 @@ class StockTerminalApp(App):
     def boss_renderable(self):
         """The single disguise page; trend images are queued for the overlay painter."""
         queue = overlay_begin() if self.overlay_enabled else None
-        renderable = render_boss_view(trackers=self.trackers)
+        renderable = render_boss_view(trackers=self.trackers, width=self.size.width)
         overlay_end()
         self.overlay_items = queue or []
         return renderable
@@ -871,6 +871,15 @@ class StockTerminalApp(App):
         except Exception:
             pass
         self.update_view()
+
+    def on_resize(self, event) -> None:
+        self.call_after_refresh(self.redraw_boss)
+
+    def redraw_boss(self) -> None:
+        if self.is_boss_mode:
+            self.update_view()
+        elif isinstance(self.top_screen(), BossScreen):
+            self.top_screen().query_one("#boss-view", Static).update(self.boss_renderable())
 
     def in_boss(self) -> bool:
         return self.is_boss_mode or isinstance(self.top_screen(), BossScreen)

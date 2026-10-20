@@ -10,7 +10,7 @@ from rich.box import SIMPLE, SQUARE, ROUNDED
 PROFILES = ["ops", "devops", "kubectl", "nginx", "cpp", "git", "python", "neovim", "gdb", "monochrome"]
 
 
-def render_devops_top(trackers=None, selected_symbol: Optional[str] = None) -> Table:
+def render_devops_top(trackers=None, selected_symbol: Optional[str] = None, width: int = 160) -> Table:
     """Disguise as Linux top / htop; holdings are mixed in as worker processes."""
     table = Table(
         box=SIMPLE,
@@ -23,20 +23,26 @@ def render_devops_top(trackers=None, selected_symbol: Optional[str] = None) -> T
     table.title = f"top - {time.strftime('%H:%M:%S')} up 42 days, 14:12, 2 users, load average: 1.42, 1.28, 1.15"
     table.caption = "Tasks: 312 total, 1 running, 311 sleeping, 0 stopped, 0 zombie | %Cpu(s): 4.2 us, 1.8 sy, 0.0 ni, 93.8 id"
 
-    table.add_column("PID", justify="right", style="bold cyan", width=6)
-    table.add_column("USER", justify="left", style="white", width=8)
-    table.add_column("PR", justify="right", style="dim", width=3)
-    table.add_column("NI", justify="right", style="dim", width=3)
-    table.add_column("VIRT", justify="right", style="dim", width=6)
-    table.add_column("RES", justify="right", style="dim", width=8)
-    table.add_column("SHR", justify="right", style="dim", width=5)
-    table.add_column("S", justify="center", style="bold green", width=2)
-    table.add_column("%CPU", justify="right", style="bold green", width=7)
-    table.add_column("%MEM", justify="right", style="cyan", width=5)
-    table.add_column("TIME+", justify="right", style="dim", width=10)
+    cols = [
+        ("PID", "right", "bold cyan", 6), ("USER", "left", "white", 8), ("PR", "right", "dim", 3),
+        ("NI", "right", "dim", 3), ("VIRT", "right", "dim", 6), ("RES", "right", "dim", 8),
+        ("SHR", "right", "dim", 5), ("S", "center", "bold green", 2), ("%CPU", "right", "bold green", 7),
+        ("%MEM", "right", "cyan", 5), ("TIME+", "right", "dim", 10),
+    ]
     if trackers:
-        table.add_column("HIST", justify="left", width=20, no_wrap=True)
+        cols.append(("HIST", "left", "", 20))
+    cmd_min = 12
+    keep = list(range(len(cols)))
+    # Narrow terminals shed low-value columns so the trend column never gets squeezed out.
+    for idx in (10, 9, 7, 6, 3, 2, 1, 0, 4):
+        if sum(cols[i][3] + 3 for i in keep) + cmd_min + 12 <= width:
+            break
+        keep.remove(idx)
+    for i in keep:
+        name, justify, style, w = cols[i]
+        table.add_column(name, justify=justify, style=style, width=w, no_wrap=True)
     table.add_column("COMMAND", justify="left", style="bold white", no_wrap=True, overflow="ellipsis", max_width=28)
+    keep.append(len(cols))
 
     fake_procs = [
         ("1042", "root", "20", "0", "4.2G", "1.2G", "24M", "S", "12.4", "3.8", "42:15.82", "/usr/bin/dockerd -H fd:// --containerd=/run/containerd.sock"),
@@ -57,7 +63,8 @@ def render_devops_top(trackers=None, selected_symbol: Optional[str] = None) -> T
         rows.sort(key=lambda r: -r[0])
     # Stock rows are built in final order so queued trend images map to rows in sequence.
     for _, row in rows:
-        table.add_row(*(_stock_process_row(row, selected_symbol) if hasattr(row, "prices") else row))
+        cells = _stock_process_row(row, selected_symbol) if hasattr(row, "prices") else row
+        table.add_row(*(cells[i] for i in keep))
 
     return table
 
@@ -382,11 +389,11 @@ def render_gdb_debugger() -> Panel:
     )
 
 
-def render_boss_view(profile: str = "ops", trackers=None):
+def render_boss_view(profile: str = "ops", trackers=None, width: int = 160):
     """Render selected boss mode camouflage profile."""
     p = profile.lower()
     if p == "ops" and trackers:
-        return render_devops_top(trackers)
+        return render_devops_top(trackers, width=width)
     if p == "devops":
         return render_devops_top()
     elif p == "kubectl":
